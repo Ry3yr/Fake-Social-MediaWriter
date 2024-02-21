@@ -1,0 +1,136 @@
+  <style>.image-placeholder {width: 45px;height: 45px;background-color: lightgray; } </style>
+  <script>
+    const queryParams = new URLSearchParams(window.location.search);
+    const isLowBandwidthMode = queryParams.get('mode') === 'lowbandwidth';
+    if (isLowBandwidthMode) {
+      window.addEventListener('DOMContentLoaded', () => {
+        const images = document.querySelectorAll('img');
+        images.forEach(image => {
+          const placeholder = document.createElement('div');
+          placeholder.classList.add('image-placeholder');
+          image.parentNode.replaceChild(placeholder, image);});});}
+  </script>
+<!-----Search Emoji--->
+<style>.hidden-image {display: none;}</style>
+<input type="text" id="imageKeyword" placeholder="Enter image keyword">
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+// Get all the images on the page
+var images = document.getElementsByTagName("img");
+function handleKeywordChange() {
+var keyword = document.getElementById('imageKeyword').value.toLowerCase();
+for (var i = 0; i < images.length; i++) {
+var img = images[i];
+var imgUrl = img.getAttribute("src");
+if (imgUrl && imgUrl.toLowerCase().includes(keyword)) {
+img.classList.remove("hidden-image");
+} else {
+img.classList.add("hidden-image");}}}
+document.getElementById('imageKeyword').addEventListener('input', handleKeywordChange);
+handleKeywordChange();
+});
+</script>
+
+<!----FetchEmoji--->
+<?php
+if (isset($_POST['button_pressed'])) {
+    $url = "https://alcea-wisteria.de/z_files/emoji/";
+    $html = file_get_contents($url);
+    preg_match_all('/<a href=[\'"](.*?\.gif)[\'"]/i', $html, $matches);
+    $gifUrls = $matches[1];
+    $gridSize = 35; // Number of columns in the grid
+    $count = 0;
+    echo "<table>";
+    echo "<tr>";
+    foreach ($gifUrls as $gifUrl) {
+        $filename = basename($gifUrl);
+        echo '<td><a href="javascript:void(0);" onclick="insertEmoji(\'' . $filename . '\');"><img src="https://alcea-wisteria.de/z_files/emoji/' . $filename . '" width=30></a></td>';
+        $count++;
+        if ($count % $gridSize == 0) {
+            echo "</tr><tr>";
+        }
+    }
+    echo "</tr>";
+    echo "</table>";
+}
+?>
+<form method="post">
+    <input type="submit" name="button_pressed" value="LoadEmoji">
+</form>
+<script>
+function insertEmoji(emoji) {
+    var textarea = document.getElementById('textbox');
+    textarea.value += ':' + emoji.split('.')[0] + ': ';
+}
+</script>
+
+<!-----SubmitCode--->
+<?php
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["specificButton"])) {
+    $value = $_POST["textbox"];
+    $user = $_GET["user"];
+    $date = date("Ymd");
+    $newData = array($date => array("value" => $value));
+    $hashtags = array();
+    preg_match_all('/#(\w+)/', $value, $matches);
+    if (!empty($matches[1])) {
+        $hashtags = $matches[1];
+    }
+    if (!empty($hashtags)) {
+        $newData[$date]["hashtags"] = implode(", ", $hashtags);
+    }
+    $filename = "data_" . $user . ".json";
+    if (file_exists($filename)) {
+        $existingData = json_decode(file_get_contents($filename), true);
+    } else {
+        $existingData = array();
+    }
+    array_unshift($existingData, $newData);
+    file_put_contents($filename, json_encode($existingData, JSON_PRETTY_PRINT));
+}
+?>
+<form method="post" action="<?php echo $_SERVER["PHP_SELF"] . "?user=" . $_GET["user"]; ?>">
+    <textarea id="textbox" name="textbox" rows="4" cols="50"></textarea>
+    <br>
+       <button type="submit" name="specificButton">save</button>
+</form>
+
+
+<a target="_blank" href="post2mtd.html" style=color:blue>Post2Mtd</a> <a target="_blank" href="https://alcea-wisteria.de/PHP//0demo/2023-08-15-JSFiddle-Clone/htmls/2023-11-04-Advanced-mtd-tl-renderer-w-Query-string-support.html?instance=mastodon.social&userid=userid" style=color:blue>TL</a>
+<a target="_blank" href="https://mastodon.social/@username.rss" style=color:blue>RSS</a> [<a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/post.php?user=alcea&mode=lowbandwidth" style=color:blue>Lowbandwidth</a>]
+<?php
+$user = $_GET['user'];
+$uniqueId = uniqid();
+$iframeSrc = "data_{$user}.json?v={$uniqueId}";
+echo '<iframe src="' . $iframeSrc . '" style="border:0px #ffffff none;" name="statusit" scrolling="no" frameborder="0" marginheight="0px" marginwidth="0px" height="250px" width="800" allowfullscreen></iframe>';
+?>
+<script>
+  var timestamp = new Date().getTime();
+  var username = new URLSearchParams(window.location.search).get("user");
+  var iframe = document.getElementById("myIframe");
+  iframe.src = "render.html?user=" + username + "&cachebust=" + timestamp;
+</script>
+<script src="/jquery.min.js"></script>
+<script type="text/javascript">
+$(document).ready(function(){
+    var username = new URLSearchParams(window.location.search).get("user");
+    var baseUrl;
+    if (window.location.protocol === "file:") {
+        baseUrl = "file://" + window.location.pathname.match(/(.*)[\/\\]/)[1];
+    } else {
+        baseUrl = window.location.href.match(/(.*)[\/\\]/)[1];
+    }
+    var url = baseUrl + "/render_limited.html?user=" + username + "";
+    if (url.includes("?")) {
+        url = url.split("?")[0]; // Use only the part before "?"
+    }
+    if (url.includes("#")) {
+        url = url.split("#")[0]; // Use only the part before "#"
+    }
+    $("#fakemtd").load(url);
+});
+</script>
+<div class="formClass">
+    <div id="fakemtd">
+    </div>
+</div>

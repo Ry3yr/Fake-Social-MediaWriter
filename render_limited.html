@@ -1,0 +1,90 @@
+<hr>
+
+<div id="container"></div>
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const limit = urlParams.get("limit") || "15";
+  const baseurl = "https://alcea-wisteria.de/z_files/emoji";
+  function getQueryParam(param) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param)
+  }
+  const user = getQueryParam('user');
+  if (user) {
+    const jsonFile = `data_${user}.json`;
+    fetch(jsonFile)
+      .then(response => response.json())
+      .then(jsonData => {
+        const container = document.getElementById('container');
+        jsonData.slice(0, limit).forEach(obj => {  // Limiting to 15 entries
+          const date = Object.keys(obj)[0];
+          const innerObj = obj[date];
+          const value = innerObj.value;
+          const hashtags = innerObj.hashtags;
+          const postElement = document.createElement('div');
+          postElement.classList.add('post');
+
+
+
+          const dateElement = document.createElement('p');
+          dateElement.textContent = `Date: ${date}`;
+          const valueElement = document.createElement('p');
+          valueElement.innerHTML = `<img src=https://alcea-wisteria.de/z_files/emoji/${user}.png width=100px><br>@<a target="_blank" href="/other/extra/scripts/fakesocialmedia/render_limited.html?user=${user}" style="color:pink">${user}</a>: ${replaceEmojis(value).replace(/(https?:\/\/[^\s]+)/g, (match) => {
+            if (match.includes('pixiv.net')) {
+              const pixivRegex = /https?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/(\d+)/;
+              const pixivMatch = match.match(pixivRegex);
+              if (pixivMatch) {
+                const artworkId = pixivMatch[1];
+                return `<div><img src="https://embed.pixiv.net/decorate.php?illust_id=${artworkId}&mode=sns-automator" width="50%"></div><br><a href="${match}" target="_blank">${match}</a>`;
+              }
+            }
+           if (match.endsWith('.gif') || match.endsWith('.png') || match.endsWith('.jpg') || match.endsWith('.jpeg')) {
+          let imageWidth = "50%"; // Default width
+          if (match.includes("emoji")) {
+           imageWidth = "45px"; // Resize width to 45x45 cause these are emoji from the function to replace shorthandtext
+            }
+            const imageElement = `<img src="${match}" width="${imageWidth}" alt="${match}">`;
+            if (match.includes(`${baseurl}`)) {
+            return imageElement;
+            } else {
+            return `${imageElement}<br><a href="${match}" target="_blank">${match}</a>`;
+            }
+            }
+            return `<a href="${match}" target="_blank">${match}</a>`;
+          }).replace(/\n/g, '<br>')}`;
+          const hashtagsElement = document.createElement('p');
+          hashtagsElement.textContent = `Hashtags: ${hashtags}`;
+          postElement.appendChild(dateElement);
+          postElement.appendChild(valueElement);
+          postElement.appendChild(hashtagsElement);
+          // Check if the value includes a YouTube link
+          if (value.includes('youtube.com')) {
+            const videoEmbed = document.createElement('iframe');
+            videoEmbed.src = `https://www.youtube.com/embed/${getVideoId(value)}`;
+            videoEmbed.width = '560';
+            videoEmbed.height = '315';
+            videoEmbed.frameborder = '0';
+            videoEmbed.allowfullscreen = 'true';
+            postElement.appendChild(videoEmbed);
+          }
+          container.appendChild(postElement);
+          const separatorElement = document.createElement('hr');
+          container.appendChild(separatorElement);
+        });
+      })
+      .catch(error => {
+        console.error('Error reading the file:', error);
+      });
+  } else {
+    console.error('User parameter not found in the query string.');
+  }
+  function getVideoId(url) {
+    const videoIdMatch = url.match(/(?:\/embed\/|v=|v\/|vi\/|youtu\.be\/|\/v\/|\/e\/|\/u\/\w\/|\/embed\/|\/v=|\/e=|\/u\/\w\/|\/vi\/)([^#\&\?]*).*/);
+    return videoIdMatch[1];
+  }
+  function replaceEmojis(text) {
+    return text.replace(/:(\w+):/g, (match, emoji) => {
+      return `${baseurl}/${emoji}.gif`;
+    });
+  }
+</script>
