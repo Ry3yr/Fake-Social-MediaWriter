@@ -14,7 +14,7 @@ Supports:
 • crossposting via post2mtd.html 0% hassle
 
 ## Demo:
-TL Output currently viewable [here](https://alceawis.de/about)
+TL Output currently viewable [here](https://alceawis.de/About?user=alcea)
 
 ## Extra Info
 
