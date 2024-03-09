@@ -11,7 +11,7 @@
   }
   const user = getQueryParam('user');
   if (user) {
-    const jsonFile = `data_${user}.json`;
+    const jsonFile = `/other/extra/scripts/fakesocialmedia/data_${user}.json`;
     fetch(jsonFile)
       .then(response => response.json())
       .then(jsonData => {
@@ -38,7 +38,7 @@
                 return `<div><img src="https://embed.pixiv.net/decorate.php?illust_id=${artworkId}&mode=sns-automator" width="50%"></div><br><a href="${match}" target="_blank">${match}</a>`;
               }
             }
-           if (match.endsWith('.gif') || match.endsWith('.png') || match.endsWith('.jpg') || match.endsWith('.jpeg')) {
+           if (match.endsWith('.gif') || match.endsWith('.png') || match.endsWith('.webp') ||match.endsWith('.jpg') || match.endsWith('.jpeg')) {
           let imageWidth = "50%"; // Default width
           if (match.includes("emoji")) {
            imageWidth = "45px"; // Resize width to 45x45 cause these are emoji from the function to replace shorthandtext
@@ -58,13 +58,15 @@
           postElement.appendChild(valueElement);
           postElement.appendChild(hashtagsElement);
           // Check if the value includes a YouTube link
-          if (value.includes('youtube.com')) {
+          if (value.includes('youtube.com') && !value.includes('youtube.com/shorts')) {
             const videoEmbed = document.createElement('iframe');
-            videoEmbed.src = `https://www.youtube.com/embed/${getVideoId(value)}`;
+            //videoEmbed.src = `https://www.youtube.com/embed/${getVideoId(value)}`;
+            videoEmbed.src = `https://super8.absturztau.be/embed/${getVideoId(value)}`;
             videoEmbed.width = '560';
             videoEmbed.height = '315';
             videoEmbed.frameborder = '0';
             videoEmbed.allowfullscreen = 'true';
+            videoEmbed.setAttribute('allowfullscreen', ''); 
             postElement.appendChild(videoEmbed);
           }
           container.appendChild(postElement);
