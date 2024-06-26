@@ -1,0 +1,20 @@
+<meta charset="utf-8">
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    let user = urlParams.get('user');
+    if (!user) {user = 'alcea';}
+    const dataUrl = `/other/extra/scripts/fakesocialmedia/data_${user}.json?t=${new Date().getTime()}`;
+    fetch(dataUrl)
+      .then(response => response.json())
+      .then(data => {
+        let dataString = typeof data === 'string' ? data : JSON.stringify(data);
+        const matches = dataString.match(/\},/g);
+        const numMatches = matches ? matches.length : 0;
+        document.getElementById('result').textContent = numMatches;
+        document.getElementById('error').textContent = '';})
+      .catch(error => {document.getElementById('error').textContent = `Error fetching data: ${error.message}`;});
+  </script>
+<hr>
+Statuses: <span id="result"></span></p><p id="error" style="color: red;"></p>
+Blog:<a target="_blank" href="https://alceawis.de/verify.html#blog">https://alceawis.de/verify.html#blog</a><br>
+Art:&nbsp;<a target="_blank" href="https://alceawis.de/verify.html#art">https://alceawis.de/verify.html#art</a><br>Underrated:&nbsp;<a target="_blank" href="https://alceawis.de/verify.html#underrated">https://alceawis.de/verify.html#underrated</a><br>Jukebox:&nbsp;<a target="_blank" href="https://alceawis.de/verify.html#jukebox">https://alceawis.de/verify.html#jukebox</a></p>
