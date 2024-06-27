@@ -1,0 +1,89 @@
+
+<div id="containerfakesocialmedia"></div>
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const limit = urlParams.get("limit") || "15";
+  const baseurl = "https://alcea-wisteria.de/z_files/emoji";
+  function getQueryParam(param) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param)}
+  const user = getQueryParam('user');
+  if (user) {
+    //const jsonFile = `/other/extra/scripts/fakesocialmedia/data_${user}.json`;
+    const jsonFile = `/other/extra/scripts/fakesocialmedia/data_${user}.json?t=${Date.now()}`;
+    fetch(jsonFile)
+      .then(response => response.json())
+      .then(jsonData => {
+        const containerfakesocialmedia = document.getElementById('containerfakesocialmedia');
+        jsonData.slice(0, limit).forEach(obj => {
+          const date = Object.keys(obj)[0];
+          const innerObj = obj[date];
+          const value = innerObj.value;
+          const hashtags = innerObj.hashtags;
+          const postElement = document.createElement('div');
+          postElement.classList.add('post');
+          const dateElement = document.createElement('p');
+          dateElement.innerHTML = `<hr>Date: ${date}`;
+          const valueElement = document.createElement('p');
+          valueElement.innerHTML = `<img src=https://alcea-wisteria.de/z_files/emoji/${user}.png width=100px><br>@<a target="_blank" href="/fakesocialrender_limited.html?user=${user}" style="color:pink">${user}</a>: ${replaceEmojis(value).replace(/(https?:\/\/[^\s]+)/g, (match) => {
+            if (match.includes('pixiv.net')) {
+              const pixivRegex = /https?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/(\d+)/;
+              const pixivMatch = match.match(pixivRegex);
+              if (pixivMatch) {
+                const artworkId = pixivMatch[1];
+                return `<div><img src="https://embed.pixiv.net/decorate.php?illust_id=${artworkId}&mode=sns-automator" width="50%"></div><br><a href="${match}" target="_blank">${match}</a>`;
+              }}
+           if (match.endsWith('.gif') || match.endsWith('.png') || match.endsWith('.webp') ||match.endsWith('.jpg') || match.endsWith('.jpeg')) {
+          let imageWidth = "50%";
+          if (match.includes("emoji")) {
+           imageWidth = "45px";}
+            const imageElement = `<img src="${match}" width="${imageWidth}" alt="${match}">`;
+            if (match.includes(`${baseurl}`)) {
+            return imageElement;
+            } else {
+            return `${imageElement}<br><a href="${match}" target="_blank">${match}</a>`;}}
+            return `<a href="${match}" target="_blank">${match}</a>`;
+          }).replace(/\n/g, '<br>')}`;
+          const hashtagsElement = document.createElement('p');
+          hashtagsElement.textContent = `Hashtags: ${hashtags}`;
+          postElement.appendChild(dateElement);
+          postElement.appendChild(valueElement);
+          postElement.appendChild(hashtagsElement);
+
+
+          // Add the button after the post
+          const buttonElement = document.createElement('a');
+          buttonElement.classList.add('btn');
+          const buttonText = value.slice(0, 25) || 'btn'; // Use 'btn' if value is empty or less than 25 characters
+          buttonElement.textContent = 'Comment';
+          buttonElement.href = `/other/extra/scripts/fakesocialmedia/comment.php?text=${encodeURIComponent(buttonText)}`;
+          buttonElement.target = "_blank"; // Add this line to open the link in a new tab
+          postElement.appendChild(buttonElement);
+
+          if (value.includes('youtube.com') && !value.includes('youtube.com/shorts')) {
+            const videoEmbed = document.createElement('iframe');
+            //videoEmbed.src = `https://super8.absturztau.be/embed/${getVideoId(value)}`;videoEmbed.width = '560';videoEmbed.height = '315';videoEmbed.frameborder = '0';videoEmbed.allowfullscreen = 'true';videoEmbed.setAttribute('allowfullscreen', '');postElement.appendChild(videoEmbed);}
+           videoEmbed.src = `https://www.youtube.com/embed/${getVideoId(value)}`;videoEmbed.width = '560';videoEmbed.height = '315';videoEmbed.frameborder = '0';videoEmbed.allowfullscreen = 'true';videoEmbed.setAttribute('allowfullscreen', '');postElement.appendChild(videoEmbed);}
+          containerfakesocialmedia.appendChild(postElement);
+          const separatorElement = document.createElement('p');
+          //container.appendChild(separatorElement);
+        });
+      })
+  } else {
+const element = document.createElement('div');
+element.textContent = 'No user specified (?user=user)';
+console.log('No user selected, defaulting to alcea');
+var currentUrl = window.location.href;
+var newUrl = currentUrl.split('?')[0] + '?user=alcea';
+window.location.href = newUrl;
+document.body.appendChild(element);
+  }
+  function getVideoId(url) {
+    const videoIdMatch = url.match(/(?:\/embed\/|v=|v\/|vi\/|youtu\.be\/|\/v\/|\/e\/|\/u\/\w\/|\/embed\/|\/v=|\/e=|\/u\/\w\/|\/vi\/)([^#\&\?]*).*/);
+    //console.log(videoIdMatch); //for checking if videoIDMatch is correct
+    return videoIdMatch[1];}
+  function replaceEmojis(text) {
+    return text.replace(/:(\w+):/g, (match, emoji) => {
+      return `${baseurl}/${emoji}.gif`;
+    });}
+</script>

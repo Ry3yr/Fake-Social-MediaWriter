@@ -1,0 +1,136 @@
+
+  <h1>Source Post: <span id="sourcepost"></span></h1>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .post {
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .date {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .content {
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
+    .hashtags {
+      font-size: 14px;
+      color: #555;
+    }
+
+    .tag {
+      margin-right: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Fake Social Media</h1>
+    <div id="results"></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      fetch('https://alceawis.de/other/extra/scripts/fakesocialmedia/data_alcea.json')
+        .then(response => response.json())
+        .then(data => {
+          const urlParams = new URLSearchParams(window.location.search);
+          const queryText = urlParams.get('text');
+          const matches = data.slice(0, 15).filter(entry => {
+            const date = Object.keys(entry)[0];
+            return entry[date].value.includes(queryText);
+          });
+          const resultsContainer = document.getElementById('results');
+          if (resultsContainer) {
+            matches.forEach(match => {
+              const date = Object.keys(match)[0];
+              const postContent = match[date].value;
+              const hashtags = match[date].hashtags.split(', ');
+              const postElement = document.createElement('div');
+              postElement.classList.add('post');
+              const dateElement = document.createElement('p');
+              dateElement.classList.add('date');
+              dateElement.textContent = date;
+
+              const contentElement = document.createElement('p');
+              contentElement.classList.add('content');
+              contentElement.textContent = postContent;
+
+              const hashtagsElement = document.createElement('div');
+              hashtagsElement.classList.add('hashtags');
+              hashtags.forEach(tag => {
+                const tagElement = document.createElement('span');
+                tagElement.classList.add('tag');
+                tagElement.textContent = `#${tag}`;
+                hashtagsElement.appendChild(tagElement);
+              });
+              postElement.appendChild(dateElement);
+              postElement.appendChild(contentElement);
+              postElement.appendChild(hashtagsElement);
+              resultsContainer.appendChild(postElement);
+            });
+          } else {
+            console.error('Error: Results container not found.');
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+        });
+    });
+  </script>
+
+
+
+
+  <h2>Comments</h2>
+  <div id="comments"></div>
+
+  <script>
+    function fetchAndDisplayComments() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const text = urlParams.get('text');
+      const sourcepost = urlParams.get('sourcepost');
+      const jsonUrl = 'https://alceawis.de/other/extra/scripts/fakesocialmedia/comments.json?v=' + Date.now();
+      fetch(jsonUrl)
+        .then(response => response.json())
+        .then(data => {
+          const matchingComments = data.filter(comment => comment.text.includes(text));
+
+          const sourcepostElement = document.getElementById('sourcepost');
+
+
+          const commentsDiv = document.getElementById('comments');
+          matchingComments.forEach(comment => {
+            const commentElement = document.createElement('div');
+            commentElement.textContent = comment.value;
+            commentsDiv.appendChild(commentElement);
+          });
+        })
+        .catch(error => {
+          console.error('Error fetching comments:', error);
+        });
+    }
+    window.onload = fetchAndDisplayComments;
+  </script>
+</body>
+</html>
