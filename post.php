@@ -1,16 +1,9 @@
-  <style>.image-placeholder {width: 45px;height: 45px;background-color: lightgray; } </style>
-  <script>
-    const queryParams = new URLSearchParams(window.location.search);
-    const isLowBandwidthMode = queryParams.get('mode') === 'lowbandwidth';
-    if (isLowBandwidthMode) {
-      window.addEventListener('DOMContentLoaded', () => {
-        const images = document.querySelectorAll('img');
-        images.forEach(image => {
-          const placeholder = document.createElement('div');
-          placeholder.classList.add('image-placeholder');
-          image.parentNode.replaceChild(placeholder, image);});});}
-  </script>
-<!-----Search Emoji--->
+<?php
+error_reporting(0);
+?>
+
+
+<script src="/jquery.min.js"></script>
 <style>.hidden-image {display: none;}</style>
 <input type="text" id="imageKeyword" placeholder="Enter image keyword">
 <script>
@@ -63,8 +56,6 @@ function insertEmoji(emoji) {
     textarea.value += ':' + emoji.split('.')[0] + ': ';
 }
 </script>
-
-<!-----SubmitCode--->
 <?php
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["specificButton"])) {
     $value = $_POST["textbox"];
@@ -94,43 +85,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["specificButton"])) {
     <br>
        <button type="submit" name="specificButton">save</button>
 </form>
-
-
-<a target="_blank" href="post2mtd.html" style=color:blue>Post2Mtd</a> <a target="_blank" href="https://alcea-wisteria.de/PHP//0demo/2023-08-15-JSFiddle-Clone/htmls/2023-11-04-Advanced-mtd-tl-renderer-w-Query-string-support.html?instance=mastodon.social&userid=userid" style=color:blue>TL</a>
-<a target="_blank" href="https://mastodon.social/@username.rss" style=color:blue>RSS</a> [<a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/post.php?user=alcea&mode=lowbandwidth" style=color:blue>Lowbandwidth</a>]
+<a target="_blank" href="post2mtd.html" style=color:blue>Post2Mtd</a> <a target="_blank" href="https://alcea-wisteria.de/PHP//0demo/2023-08-15-JSFiddle-Clone/htmls/2023-11-04-Advanced-mtd-tl-renderer-w-Query-string-support.html?instance=mas.to&userid=111958546062297646" style=color:blue>TimeLine</a>
+<a target="_blank" href="https://mas.to/@arusea.rss" style=color:blue>RSS</a> <!--[<a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/post.php?user=alcea&mode=lowbandwidth" style=color:blue>Lowbandwidth</a>]---> <a target="_blank" href="del.php?user=alcea" style=color:blue>del</a>
 <?php
 $user = $_GET['user'];
 $uniqueId = uniqid();
 $iframeSrc = "data_{$user}.json?v={$uniqueId}";
 echo '<iframe src="' . $iframeSrc . '" style="border:0px #ffffff none;" name="statusit" scrolling="no" frameborder="0" marginheight="0px" marginwidth="0px" height="250px" width="800" allowfullscreen></iframe>';
 ?>
-<script>
-  var timestamp = new Date().getTime();
-  var username = new URLSearchParams(window.location.search).get("user");
-  var iframe = document.getElementById("myIframe");
-  iframe.src = "render.html?user=" + username + "&cachebust=" + timestamp;
-</script>
-<script src="/jquery.min.js"></script>
+<!--<iframe src="
+/fakesocialrender_limited.html?user=alcea
+" style="border:0px #ffffff none;" name="statusit" scrolling="no" frameborder="0" marginheight="0px" marginwidth="0px" height="6000px" width="100%" allowfullscreen></iframe>-->
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script type="text/javascript">
 $(document).ready(function(){
-    var username = new URLSearchParams(window.location.search).get("user");
-    var baseUrl;
-    if (window.location.protocol === "file:") {
-        baseUrl = "file://" + window.location.pathname.match(/(.*)[\/\\]/)[1];
-    } else {
-        baseUrl = window.location.href.match(/(.*)[\/\\]/)[1];
-    }
-    var url = baseUrl + "/render_limited.html?user=" + username + "";
-    if (url.includes("?")) {
-        url = url.split("?")[0]; // Use only the part before "?"
-    }
-    if (url.includes("#")) {
-        url = url.split("#")[0]; // Use only the part before "#"
-    }
-    $("#fakemtd").load(url);
+var baseUrl = "/fakesocialrender_limited.html";
+$("#mtdcomm").load(baseUrl + "");
 });
 </script>
 <div class="formClass">
-    <div id="fakemtd">
-    </div>
+<div id="mtdcomm">
 </div>
+</div>
+
