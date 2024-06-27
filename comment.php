@@ -1,4 +1,5 @@
 <?php
+// 2024-06-27
 if (file_exists('comments.json')) {
     $existingData = json_decode(file_get_contents('comments.json'), true);
 } else {
@@ -6,11 +7,12 @@ if (file_exists('comments.json')) {
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $text = $_GET['text'];
-    $value = $_POST['value'];
-    array_unshift($existingData, array(
+    $date = date('Y-m-d');
+    $value = "" . $date . "\n" . $_POST['value'];
+    $existingData[] = array(
         'text' => $text,
         'value' => $value
-    ));
+    );
     $jsonData = json_encode($existingData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     file_put_contents('comments.json', $jsonData);
 }
