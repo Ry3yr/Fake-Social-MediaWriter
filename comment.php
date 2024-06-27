@@ -5,7 +5,7 @@ if (file_exists('comments.json')) {
     $existingData = array();
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $text = $_POST['text'];
+    $text = $_GET['text'];
     $value = $_POST['value'];
     array_unshift($existingData, array(
         'text' => $text,
@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <h2>Add a Comment</h2>
     <form method="post">
         <label for="text">Target:</label>
-        <input type="text" id="text" name="text" value="<?php echo isset($_GET['text']) ? $_GET['text'] : ''; ?>">
+        <input type="text" id="text" name="text" value="<?php echo $_GET['text']; ?>">
         <br>
         <label for="value">Value:</label>
         <textarea id="value" name="value" cols="25" rows="15"></textarea>
@@ -26,5 +26,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <button type="submit">Submit</button>
     </form>
     <!---<script>
-        document.getElementById('textDisplay').textContent = '<?php echo isset($_GET['text']) ? $_GET['text'] : 'not set'; ?>';
+        document.getElementById('textDisplay').textContent = '<?php echo $_GET['text']; ?>';
     </script>-->
