@@ -1,5 +1,6 @@
 
 <div id="containerfakesocialmedia"></div>
+<div id="error"></div>
 <script>
   const urlParams = new URLSearchParams(window.location.search);
   const limit = urlParams.get("limit") || "15";
@@ -50,15 +51,24 @@
           postElement.appendChild(valueElement);
           postElement.appendChild(hashtagsElement);
 
+          const buttonElement = document.createElement('button');
+buttonElement.classList.add('btn');
+const buttonText = value.slice(0, 25) || 'btn'; // Use 'btn' if value is empty or less than 25 characters
+buttonElement.textContent = 'Comment';
+buttonElement.addEventListener('click', () => {
+  window.open(`/other/extra/scripts/fakesocialmedia/comment.php?text=${encodeURIComponent(buttonText)}`, '_blank');
+});
+postElement.appendChild(buttonElement);
 
-          // Add the button after the post
-          const buttonElement = document.createElement('a');
-          buttonElement.classList.add('btn');
-          const buttonText = value.slice(0, 25) || 'btn'; // Use 'btn' if value is empty or less than 25 characters
-          buttonElement.textContent = 'Comment';
-          buttonElement.href = `/other/extra/scripts/fakesocialmedia/comment.php?text=${encodeURIComponent(buttonText)}`;
-          buttonElement.target = "_blank"; // Add this line to open the link in a new tab
-          postElement.appendChild(buttonElement);
+          // Comment href2
+          const buttonElement2 = document.createElement('a');
+          buttonElement2.classList.add('btn2');
+          const buttonText2 = value.slice(0, 25) || 'btn'; // Use 'btn' if value is empty or less than 25 characters
+          buttonElement2.textContent = '(load comments)';
+          buttonElement2.href = `/other/extra/scripts/fakesocialmedia/commentload.html?text=${encodeURIComponent(buttonText2)}`;
+          buttonElement2.target = "_blank"; // Open the link in a new tab
+          postElement.appendChild(buttonElement2);
+
 
           if (value.includes('youtube.com') && !value.includes('youtube.com/shorts')) {
             const videoEmbed = document.createElement('iframe');
