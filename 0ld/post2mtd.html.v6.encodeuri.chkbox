@@ -1,0 +1,83 @@
+<div style="position: relative;">
+  <textarea id="outputTextarea" rows="10" cols="50"></textarea>
+  <p style="position: absolute; bottom: -20px;">Character Count: <span id="characterCount">0</span></p>
+</div>
+<button onclick="fetchData()">PostToMTD</button>
+<input type="checkbox" id="utf8Checkbox"> UTF-8
+<input type="checkbox" id="encodeuriCheckbox"> encodeduri
+<script>
+  function displayData() {
+    fetch('https://alceawis.de/other/extra/scripts/fakesocialmedia/data_alcea.json')
+      .then(response => response.json())
+      .then(data => {
+        let targetIndex = 1; // Change this value to target a different position (starting from 1)
+        if (targetIndex >= 1 && targetIndex <= data.length) {
+          const targetObject = data[targetIndex - 1];
+          const targetKey = Object.keys(targetObject)[0];
+          const value = targetObject[targetKey].value;
+          document.getElementById('outputTextarea').value = value;
+          document.querySelector('#replaceButton').click();
+          // Call countCharacters after setting the textarea value
+          countCharacters();
+        }
+      });
+  }
+
+  function countCharacters() {
+    const textarea = document.getElementById('outputTextarea');
+    const characterCount = document.getElementById('characterCount');
+    const text = textarea.value;
+    const count = text.length;
+    characterCount.textContent = count;
+  }
+
+  function fetchData() {
+    var user = "111958546062297646";
+    var apikey = "";
+    var instanceurl = "https://mastodon.social/api/v1/statuses";
+    const textarea = document.getElementById('outputTextarea');
+    const value = textarea.value;
+    const utf8Checkbox = document.getElementById('utf8Checkbox');
+    const encodeuriCheckbox = document.getElementById('encodeuriCheckbox');
+    let processedValue;
+    let url = `/mtdapiposter.html?user=${user}&apikey=${apikey}&instanceurl=${instanceurl}&value=`;
+    if (utf8Checkbox.checked) {
+      // Process the content as UTF-8
+      const encoder = new TextEncoder();
+      const data = encoder.encode(value);
+      processedValue = Array.from(data).map(byte => '%' + byte.toString(16)).join('');
+      url += processedValue + '&encoding=utf8';
+    } else if (encodeuriCheckbox.checked) {
+      // Process the content as encodeduri
+      processedValue = encodeURIComponent(value);
+      url += processedValue + '&encoding=encodeuri';
+    } else {
+      // Process the content as Base64
+      processedValue = btoa(value);
+      url += processedValue;
+    }
+    window.open(url, '_blank');
+  }
+
+  document.getElementById('outputTextarea').addEventListener('input', countCharacters);
+  document.addEventListener("DOMContentLoaded", displayData);
+</script>
+
+<button id="replaceButton">Arusea</button>
+<script>
+function replaceText() {
+  var textField = document.getElementById("outputTextarea");
+  var newText = textField.value.replace(/Alcea/gi, "arusea");textField.value = newText;}
+document.getElementById("replaceButton").addEventListener("click", replaceText);
+</script>
+
+
+<button id="MTDClassicShare" onclick="replacemtdText()">Regular post</button>
+<script>
+function replacemtdText() {
+  var textField = document.getElementById("outputTextarea");
+  var encodedtextValue = encodeURIComponent(textField.value);
+  var shareUrl = "https://mastodon.social/share?text=" + encodedtextValue;
+  window.open(shareUrl, "_blank");
+}
+</script>
