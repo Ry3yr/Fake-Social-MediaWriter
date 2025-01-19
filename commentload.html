@@ -1,62 +1,25 @@
-
-  <h1>Source Post: <span id="sourcepost"></span></h1>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <meta charset="UTF-8">
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-    }
-
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-
-    .post {
-      background-color: white;
-      border-radius: 5px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-
-    .date {
-      color: #888;
-      font-size: 14px;
-      margin-bottom: 10px;
-    }
-
-    .content {
-      font-size: 16px;
-      margin-bottom: 10px;
-    }
-
-    .hashtags {
-      font-size: 14px;
-      color: #555;
-    }
-
-    .tag {
-      margin-right: 5px;
-    }
+body{font-family:Arial,sans-serif;margin:0;padding:0}.container{max-width:800px;margin:0 auto;padding:20px}.post{background-color:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1);padding:20px;margin-bottom:20px}.content,.date{margin-bottom:10px}.date{color:#888;font-size:14px}.content{font-size:16px}.hashtags{font-size:14px;color:#555}.tag{margin-right:5px}a{color:pink;text-decoration:none}a:hover{text-decoration:underline}img{max-width:100%;height:auto}iframe{width:100%;height:315px;margin-top:10px;border:none}
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Fake Social Media</h1>
     <div id="results"></div>
   </div>
-
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      fetch('https://alceawis.de/other/extra/scripts/fakesocialmedia/data_alcea.json')
+      fetch('/other/extra/scripts/fakesocialmedia/data_alcea.json?v=' + Date.now())
         .then(response => response.json())
         .then(data => {
+          const urlParams2 = new URLSearchParams(window.location.search);
+          const queryText = urlParams2.get('text');
           const urlParams = new URLSearchParams(window.location.search);
-          const queryText = urlParams.get('text');
-          const matches = data.slice(0, 15).filter(entry => {
+          const number = urlParams.get('number') || 40;
+
+
+          const matches = data.slice(0, number).filter(entry => {
             const date = Object.keys(entry)[0];
             return entry[date].value.includes(queryText);
           });
@@ -64,18 +27,51 @@
           if (resultsContainer) {
             matches.forEach(match => {
               const date = Object.keys(match)[0];
-              const postContent = match[date].value;
+              //const user = match[date].user;
+              const user = "alcea";
+              const value = match[date].value;
               const hashtags = match[date].hashtags.split(', ');
               const postElement = document.createElement('div');
               postElement.classList.add('post');
               const dateElement = document.createElement('p');
               dateElement.classList.add('date');
               dateElement.textContent = date;
+              postElement.appendChild(dateElement);
+              const valueElement = document.createElement('p');
+              valueElement.innerHTML = `<img src="https://alcea-wisteria.de/z_files/emoji/alcea.png" width="100px"><br>
+                @<a target="_blank" href="/fakesocialrender_limited.html?user=${user}" style="color:pink">${user}</a>: 
+                ${replaceEmojis(value).replace(/(https?:\/\/[^\s]+)/g, (match) => {
+                  if (match.includes('youtube.com') || match.includes('youtu.be')) {
+                    const videoId = getYouTubeVideoId(match);
+                    if (videoId) {
+                      return `<iframe src="https://www.youtube.com/embed/${videoId}" allowfullscreen></iframe>`;
+                    }
+                  }
+                  if (match.includes('pixiv.net')) {
+                    const pixivRegex = /https?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/(\d+)/;
+                    const pixivMatch = match.match(pixivRegex);
+                    if (pixivMatch) {
+                      const artworkId = pixivMatch[1];
+                      return `<div><img src="https://embed.pixiv.net/decorate.php?illust_id=${artworkId}&mode=sns-automator" width="50%"></div><br><a href="${match}" target="_blank">${match}</a>`;
+                    }
+                  }
+if (match.endsWith('.gif') || match.endsWith('.png') || match.endsWith('.webp') || match.endsWith('.jpg') || match.endsWith('.jpeg')) {
+    let imageWidth = "50%";
+    let imageElement = `<img src="${match}" width="${imageWidth}" alt="${match}">`;
 
-              const contentElement = document.createElement('p');
-              contentElement.classList.add('content');
-              contentElement.textContent = postContent;
+    // Check if the match is an emoji (this can be identified by a keyword in the URL, like "emoji")
+    if (match.includes("emoji")) {
+        imageWidth = "45px";  // Adjust width for emoji
+        imageElement = `<img src="${match}" width="${imageWidth}" alt="${match}">`;
+        return imageElement;  // Only return the image element for emojis, without the link
+    }
 
+    // For non-emoji images, return the image and the link
+    return `${imageElement}<br><a href="${match}" target="_blank">${match}</a>`;
+}
+                  return `<a href="${match}" target="_blank">${match}</a>`;
+                }).replace(/\n/g, '<br>')}`;
+              postElement.appendChild(valueElement);
               const hashtagsElement = document.createElement('div');
               hashtagsElement.classList.add('hashtags');
               hashtags.forEach(tag => {
@@ -84,8 +80,6 @@
                 tagElement.textContent = `#${tag}`;
                 hashtagsElement.appendChild(tagElement);
               });
-              postElement.appendChild(dateElement);
-              postElement.appendChild(contentElement);
               postElement.appendChild(hashtagsElement);
               resultsContainer.appendChild(postElement);
             });
@@ -97,20 +91,29 @@
           console.error('Error fetching data:', error);
         });
     });
+    function replaceEmojis(text) {
+        return text.replace(/:(\w+):/g, (match, emoji) => {
+            return `https://alcea-wisteria.de/z_files/emoji/${emoji}.gif`;
+  });
+    }
+    function getYouTubeVideoId(url) {
+      const videoIdMatch = url.match(/(?:v=|\/(?:embed|v|shorts)\/|youtu\.be\/|vi\/)([a-zA-Z0-9_-]{11})/);
+      return videoIdMatch ? videoIdMatch[1] : null;
+    }
   </script>
+</body>
 
 
 
-
+<!---Display Comments-->
   <h2>Comments</h2>
   <div id="comments"></div>
-
   <script>
     function fetchAndDisplayComments() {
       const urlParams = new URLSearchParams(window.location.search);
       const text = urlParams.get('text');
       const sourcepost = urlParams.get('sourcepost');
-      const jsonUrl = 'https://alceawis.de/other/extra/scripts/fakesocialmedia/comments.json?v=' + Date.now();
+      const jsonUrl = '/other/extra/scripts/fakesocialmedia/comments.json?v=' + Date.now();
       fetch(jsonUrl)
         .then(response => response.json())
         .then(data => {
