@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -89,16 +90,21 @@ if (user) {
                         hashtagsElement.textContent = `Hashtags: ${hashtags}`;
                         postElement.appendChild(dateElement);
                         postElement.appendChild(valueElement);
+
           //quote function
-          const quoteRegex = /𒐫(.*?)𒐫/g;let match;
-          while ((match = quoteRegex.exec(value)) !== null) {
-          const quoteBlock = document.createElement('div');
-          quoteBlock.style.borderLeft = '4px solid #ccc';
-          quoteBlock.style.padding = '10px';
-          quoteBlock.style.backgroundColor = '#f9f9f9';
-          quoteBlock.textContent = match[1];
-          postElement.appendChild(quoteBlock);}
-                        postElement.appendChild(hashtagsElement);
+          const quoteRegex = /𒐫([\s\S]*?)𒐫/g; // Updated regex to support multiline matching
+let match;
+while ((match = quoteRegex.exec(value)) !== null) {
+    const quoteBlock = document.createElement('div');
+    quoteBlock.style.borderLeft = '4px solid #ccc';
+    quoteBlock.style.padding = '10px';
+    quoteBlock.style.backgroundColor = '#f9f9f9';
+    const formattedQuote = match[1].replace(/\n/g, '<br>');
+    quoteBlock.innerHTML = formattedQuote.trim();
+    postElement.appendChild(quoteBlock);
+}
+postElement.appendChild(hashtagsElement);
+
 
           const buttonElement = document.createElement('button');
           buttonElement.classList.add('btn');
