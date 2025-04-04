@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -63,8 +62,9 @@ if (user) {
                         const dateElement = document.createElement('p');
                         dateElement.innerHTML = `<hr>Date: ${date}`;
                         const valueElement = document.createElement('p');
-                        valueElement.innerHTML = `<img src=https://alcea-wisteria.de/z_files/emoji/${user}.png width=100px><br>@<a target="_blank" href="/fakesocialrender_limited.html?user=${user}" style="color:pink">${user}</a>: ${replaceEmojis(value).replace(/(https?:\/\/[^\s]+)/g, (match) => {
-                            if (match.includes('pixiv.net')) {
+                        const valueWithoutQuotes = value.replace(/𒐫[\s\S]*?𒐫/g, ''); // Removes 𒐫...𒐫 block
+                        valueElement.innerHTML = `<img src=https://alcea-wisteria.de/z_files/emoji/${user}.png width=100px><br>@<a target="_blank" href="/fakesocialrender_limited.html?user=${user}" style="color:pink">${user}</a>: ${replaceEmojis(valueWithoutQuotes).replace(/(https?:\/\/[^\s]+)/g, (match) => {
+    if (match.includes('pixiv.net')) {
                                 const pixivRegex = /https?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/(\d+)/;
                                 const pixivMatch = match.match(pixivRegex);
                                 if (pixivMatch) {
