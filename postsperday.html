@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Posts Chart</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    #controls {
+      margin-bottom: 15px;
+    }
+    #totalPosts {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+<p id="totalPosts">Total Posts: 0</p>
+  <div id="controls">
+    <input type="text" id="monthInput" placeholder="e.g. 06-2025" />
+    <button onclick="filterByMonth()">Filter</button>
+  </div>
+
+  <canvas id="postsChart" width="400" height="200"></canvas>
+  
+
+  <script>
+    let allData = [];
+    let chart;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const now = new Date();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyy = now.getFullYear();
+      document.getElementById('monthInput').value = `${mm}-${yyyy}`;
+    });
+
+    fetch('/other/extra/scripts/fakesocialmedia/data_alcea.json')
+      .then(res => res.json())
+      .then(json => {
+        allData = json;
+        renderChartForMonth(null); // Show all by default
+      });
+
+    function renderChartForMonth(monthYear) {
+      const postCounts = {};
+      let totalPosts = 0;
+
+      allData.forEach(entry => {
+        const rawDate = Object.keys(entry)[0];
+        const yyyy = rawDate.slice(0, 4);
+        const mm = rawDate.slice(4, 6);
+        const dd = rawDate.slice(6, 8);
+        const formatted = `${yyyy}-${mm}-${dd}`;
+
+        if (monthYear) {
+          const [filterMM, filterYYYY] = monthYear.split("-");
+          if (mm !== filterMM || yyyy !== filterYYYY) return;
+        }
+
+        if (!postCounts[formatted]) postCounts[formatted] = 0;
+        postCounts[formatted]++;
+        totalPosts++;
+      });
+
+      // Update total post count
+      document.getElementById('totalPosts').textContent = `Total Posts: ${totalPosts}`;
+
+      const sortedDates = Object.keys(postCounts).sort();
+      const counts = sortedDates.map(date => postCounts[date]);
+
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById('postsChart'), {
+        type: 'line',
+        data: {
+          labels: sortedDates,
+          datasets: [{
+            label: 'Posts per Day',
+            data: counts,
+            fill: false,
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.3,
+            pointRadius: 4,
+            pointHoverRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          onClick: (e, elements) => {
+            if (elements.length > 0) {
+              const index = elements[0].index;
+              const clickedDate = chart.data.labels[index];
+              const url = `https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?date=${clickedDate}`;
+              window.open(url, '_blank');
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                stepSize: 1
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function filterByMonth() {
+      const input = document.getElementById('monthInput').value.trim();
+      const valid = /^\d{2}-\d{4}$/.test(input);
+      if (!valid) {
+        alert('Please enter a valid month in MM-YYYY format (e.g. 06-2025)');
+        return;
+      }
+      renderChartForMonth(input);
+    }
+  </script>
+
+</body>
+</html>
