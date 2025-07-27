@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Posts Chart with Exact Sine Fit</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    #controls {
+      margin-bottom: 15px;
+    }
+    #totalPosts {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    #sineFunction {
+      white-space: pre-wrap;
+      font-family: monospace;
+      background: #f4f4f4;
+      padding: 10px;
+      margin-top: 15px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      min-height: 2em;
+    }
+  </style>
+</head>
+<body>
+  <p id="totalPosts">Total Posts: 0</p>
+  <div id="controls">
+    <input type="text" id="monthInput" placeholder="e.g. 06-2025" />
+    <button onclick="filterByMonth()">Filter</button>
+  </div>
+
+  <canvas id="postsChart" width="600" height="300"></canvas>
+  <div id="sineFunction"></div>
+
+  <script>
+    let allData = [];
+    let chart;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const now = new Date();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyy = now.getFullYear();
+      document.getElementById('monthInput').value = `${mm}-${yyyy}`;
+    });
+
+    fetch('/other/extra/scripts/fakesocialmedia/data_alcea.json')
+      .then(res => res.json())
+.then(json => {
+  allData = json;
+  const queryMonth = getQueryParam("month");
+  renderChartForMonth(queryMonth);
+});
+// Parse query string and apply month filter
+function getQueryParam(key) {
+  const params = new URLSearchParams(window.location.search);
+  return params.get(key);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  const defaultMonth = `${mm}-${yyyy}`;
+
+  const queryMonth = getQueryParam("month");
+  const inputMonth = queryMonth || defaultMonth;
+
+  document.getElementById('monthInput').value = inputMonth;
+});
+
+    function transpose(A) {
+      return A[0].map((_, i) => A.map(row => row[i]));
+    }
+
+    function matMul(A, B) {
+      const rowsA = A.length, colsA = A[0].length;
+      const rowsB = B.length, colsB = Array.isArray(B[0]) ? B[0].length : 1;
+      if (colsA !== rowsB) throw new Error('Matrix size mismatch');
+      const result = Array(rowsA).fill(0).map(() => Array(colsB).fill(0));
+      for (let i=0; i < rowsA; i++) {
+        for (let j=0; j < colsB; j++) {
+          let sum = 0;
+          for (let k=0; k < colsA; k++) {
+            sum += A[i][k] * (colsB === 1 ? B[k] : B[k][j]);
+          }
+          result[i][j] = sum;
+        }
+      }
+      return colsB === 1 ? result.map(r => r[0]) : result;
+    }
+
+    function solveLinearSystem(AtA, AtY) {
+      const n = AtY.length;
+      AtA = AtA.map(row => row.slice());
+      AtY = AtY.slice();
+
+      for (let i = 0; i < n; i++) {
+        let maxRow = i;
+        for (let k = i + 1; k < n; k++) {
+          if (Math.abs(AtA[k][i]) > Math.abs(AtA[maxRow][i])) maxRow = k;
+        }
+        if (maxRow !== i) {
+          [AtA[i], AtA[maxRow]] = [AtA[maxRow], AtA[i]];
+          [AtY[i], AtY[maxRow]] = [AtY[maxRow], AtY[i]];
+        }
+        if (Math.abs(AtA[i][i]) < 1e-14) continue;
+
+        for (let k = i + 1; k < n; k++) {
+          const factor = AtA[k][i] / AtA[i][i];
+          for (let j = i; j < n; j++) AtA[k][j] -= factor * AtA[i][j];
+          AtY[k] -= factor * AtY[i];
+        }
+      }
+
+      const x = Array(n).fill(0);
+      for (let i = n - 1; i >= 0; i--) {
+        let sum = AtY[i];
+        for (let j = i + 1; j < n; j++) sum -= AtA[i][j] * x[j];
+        x[i] = Math.abs(AtA[i][i]) > 1e-14 ? sum / AtA[i][i] : 0;
+      }
+      return x;
+    }
+
+    // Build design matrix for exact interpolation: [1, cos(kx), sin(kx) ...]
+    function buildDesignMatrixExact(x) {
+      const N = x.length;
+      const maxFreq = Math.floor((N - 1) / 2);
+      const M = 1 + 2 * maxFreq;
+      const A = Array(N).fill(0).map(() => Array(M).fill(0));
+
+      for (let i = 0; i < N; i++) {
+        A[i][0] = 1; // constant term
+        for (let k = 1; k <= maxFreq; k++) {
+          A[i][2*k - 1] = Math.cos(k * x[i]);
+          A[i][2*k] = Math.sin(k * x[i]);
+        }
+      }
+      return { A, maxFreq };
+    }
+
+    function formatExactSine(coeffs, maxFreq) {
+      let res = `f(x) = ${coeffs[0].toFixed(4)}`;
+      for (let k = 1; k <= maxFreq; k++) {
+        const a = coeffs[2*k - 1];
+        const b = coeffs[2*k];
+        const mag = Math.sqrt(a*a + b*b);
+        if (mag < 1e-3) continue;
+        const phase = Math.atan2(b, a);
+        res += ` + ${mag.toFixed(4)} * sin(${k} * x + ${phase.toFixed(3)})`;
+      }
+      return res;
+    }
+
+    function renderChartForMonth(monthYear) {
+      const postCounts = {};
+      let totalPosts = 0;
+
+      allData.forEach(entry => {
+        const rawDate = Object.keys(entry)[0];
+        const yyyy = rawDate.slice(0, 4);
+        const mm = rawDate.slice(4, 6);
+        const dd = rawDate.slice(6, 8);
+        const formatted = `${yyyy}-${mm}-${dd}`;
+
+        if (monthYear) {
+          const [filterMM, filterYYYY] = monthYear.split("-");
+          if (mm !== filterMM || yyyy !== filterYYYY) return;
+        }
+
+        if (!postCounts[formatted]) postCounts[formatted] = 0;
+        postCounts[formatted]++;
+        totalPosts++;
+      });
+
+      document.getElementById('totalPosts').textContent = `Total Posts: ${totalPosts}`;
+
+      const sortedDates = Object.keys(postCounts).sort();
+      if (sortedDates.length === 0) {
+        if(chart) chart.destroy();
+        document.getElementById('sineFunction').textContent = "No data for this month.";
+        return;
+      }
+
+      const counts = sortedDates.map(date => postCounts[date]);
+      const N = sortedDates.length;
+
+      if (N > 40) {
+        if(chart) chart.destroy();
+        document.getElementById('sineFunction').textContent = "Sine fit skipped for >40 data points.";
+        chart = new Chart(document.getElementById('postsChart'), {
+          type: 'line',
+          data: {
+            labels: sortedDates,
+            datasets: [{
+              label: 'Posts per Day',
+              data: counts,
+              borderColor: 'rgba(75, 192, 192, 1)',
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              fill: false,
+              tension: 0.3,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            },
+            onClick: (e, elements) => {
+              if (elements.length > 0) {
+                const index = elements[0].index;
+                const clickedDate = chart.data.labels[index];
+                const url = `https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?date=${clickedDate}`;
+                window.open(url, '_blank');
+              }
+            }
+          }
+        });
+        return;
+      }
+
+      // Normalize x to [0, 2π]
+      const x = counts.map((_, i) => (i / N) * 2 * Math.PI);
+
+      // Build design matrix for exact fit
+      const { A, maxFreq } = buildDesignMatrixExact(x);
+
+      // Solve exact linear system: A * coeffs = counts
+      const At = transpose(A);
+      const AtA = matMul(At, A);
+      const AtY = matMul(At, counts);
+
+      const coeffs = solveLinearSystem(AtA, AtY);
+
+      // Calculate fitted values exactly matching points
+      const fittedY = x.map(xi => {
+        let val = coeffs[0];
+        for (let k = 1; k <= maxFreq; k++) {
+          val += coeffs[2*k - 1] * Math.cos(k * xi) + coeffs[2*k] * Math.sin(k * xi);
+        }
+        return val;
+      });
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(document.getElementById('postsChart'), {
+        type: 'line',
+        data: {
+          labels: sortedDates,
+          datasets: [
+            {
+              label: 'Posts per Day',
+              data: counts,
+              borderColor: 'rgba(75, 192, 192, 1)',
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              fill: false,
+              tension: 0.3,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              yAxisID: 'y',
+            },
+            {
+              label: 'Exact Sine Fit',
+              data: fittedY,
+              borderColor: 'rgba(192, 75, 192, 1)',
+              backgroundColor: 'rgba(192, 75, 192, 0.2)',
+              fill: false,
+              tension: 0.3,
+              borderDash: [6, 4],
+              pointRadius: 0,
+              yAxisID: 'y',
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+          },
+          onClick: (e, elements) => {
+            if (elements.length > 0) {
+              const index = elements[0].index;
+              const clickedDate = chart.data.labels[index];
+              const url = `https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?date=${clickedDate}`;
+              window.open(url, '_blank');
+            }
+          }
+        }
+      });
+
+      document.getElementById('sineFunction').textContent = formatExactSine(coeffs, maxFreq);
+    }
+
+    function filterByMonth() {
+      const input = document.getElementById('monthInput').value.trim();
+      const valid = /^\d{2}-\d{4}$/.test(input);
+      if (!valid) {
+        alert('Please enter a valid month in MM-YYYY format (e.g. 06-2025)');
+        return;
+      }
+      renderChartForMonth(input);
+    }
+  </script>
+</body>
+</html>
