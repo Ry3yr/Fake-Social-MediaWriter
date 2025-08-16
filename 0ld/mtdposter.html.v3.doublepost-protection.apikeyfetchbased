@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Akkoma Poster</title>
+  <style>
+    #hiddenText { display: none; }
+    #readBtn { display: none; margin-top: 5px; }
+    #debugLog {
+      border: 1px solid #ccc;
+      background: #f9f9f9;
+      padding: 10px;
+      margin-top: 15px;
+      font-family: monospace;
+      font-size: 0.9em;
+      max-height: 250px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    #jsonPreview {
+      border: 1px solid #999;
+      background: #f0f0f0;
+      padding: 10px;
+      margin-top: 15px;
+      font-family: monospace;
+      font-size: 0.9em;
+      white-space: pre-wrap;
+    }
+    #postBtn {
+      transition: opacity 0.3s ease;
+    }
+    .already-posted {
+      opacity: 0.5;
+      cursor: not-allowed;
+      position: relative;
+    }
+    .already-posted::after {
+      content: "Already posted";
+      position: absolute;
+      top: -25px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ffeb3b;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .partially-posted {
+      opacity: 0.7;
+      cursor: not-allowed;
+      position: relative;
+    }
+    .partially-posted::after {
+      content: "Similar content posted";
+      position: absolute;
+      top: -25px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ff9800;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <h2>Akkoma Poster</h2>
+
+  <label>API Key: <input type="text" id="apikey" /></label><br />
+  <label>Instance URL: <input type="text" id="instance" /></label><br />
+  <label><input type="checkbox" id="htmlMode" checked onchange="toggleMode('html')" /> HTML mode</label><br />
+  <label><input type="checkbox" id="mfmMode" onchange="toggleMode('mfm')" /> MFM mode</label><br />
+  <button id="readBtn" onclick="readFromStorage()">Read from Storage</button><br /><br />
+<a target="_blank" href="mfm.html" style=color:blue>MFM Markdown</a><br>
+
+  <textarea id="mainText" rows="10" cols="50"></textarea><br /><br />
+  <button id="postBtn" onclick="postToAkkoma()">Post</button>
+
+  <div id="hiddenText"></div>
+
+  <h3>📦 JSON that will be saved:</h3>
+  <div id="jsonPreview" contenteditable="true">{}</div>
+
+  <h3>🪵 Debug Log</h3>
+  <div id="debugLog"><strong>Debug Log:</strong><br /></div>
+
+  <script>
+    let latestPosts = [];
+    
+    function logToDom(message) {
+      const logDiv = document.getElementById("debugLog");
+      const timestamp = new Date().toISOString();
+      logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function readFromStorage() {
+      const apiKey = localStorage.getItem("apikey");
+      const instance = localStorage.getItem("instance");
+      if (apiKey && instance) {
+        document.getElementById("apikey").value = apiKey;
+        document.getElementById("instance").value = instance;
+        logToDom("Read API key and instance from localStorage");
+      } else {
+        logToDom("No data found in localStorage");
+      }
+    }
+
+    function toggleMode(mode) {
+      const htmlMode = document.getElementById("htmlMode");
+      const mfmMode = document.getElementById("mfmMode");
+      
+      if (mode === 'html') {
+        if (htmlMode.checked) {
+          mfmMode.checked = false;
+        }
+      } else if (mode === 'mfm') {
+        if (mfmMode.checked) {
+          htmlMode.checked = false;
+        }
+      }
+      logToDom(`Mode changed: ${mode} (HTML: ${htmlMode.checked}, MFM: ${mfmMode.checked})`);
+    }
+
+    function compareContent(newContent, existingContent) {
+      // Simple comparison - you might want to make this more sophisticated
+      const newLines = newContent.split('\n').filter(line => line.trim().length > 0);
+      const existingLines = existingContent.split('\n').filter(line => line.trim().length > 0);
+      
+      // Check for exact match
+      if (newContent === existingContent) {
+        return 'exact';
+      }
+      
+      // Check for partial match (more than 50% of lines match)
+      const matchingLines = newLines.filter(line => 
+        existingLines.some(existingLine => existingLine.includes(line) || line.includes(existingLine))
+      );
+      
+      const similarity = matchingLines.length / Math.max(newLines.length, existingLines.length);
+      if (similarity > 0.5) {
+        return 'partial';
+      }
+      
+      return 'none';
+    }
+
+    function updatePostButtonStatus() {
+      const hiddenText = document.getElementById("hiddenText").innerText;
+      const postBtn = document.getElementById("postBtn");
+      
+      if (!hiddenText) {
+        postBtn.classList.remove('already-posted', 'partially-posted');
+        return;
+      }
+      
+      let hasExactMatch = false;
+      let hasPartialMatch = false;
+      
+      // Check against the latest 3 posts
+      for (let i = 0; i < Math.min(3, latestPosts.length); i++) {
+        const comparison = compareContent(hiddenText, latestPosts[i].content);
+        if (comparison === 'exact') {
+          hasExactMatch = true;
+          break;
+        } else if (comparison === 'partial') {
+          hasPartialMatch = true;
+        }
+      }
+      
+      // Update button appearance
+      postBtn.classList.remove('already-posted', 'partially-posted');
+      if (hasExactMatch) {
+        postBtn.classList.add('already-posted');
+        logToDom("⚠️ Content matches an existing post exactly");
+      } else if (hasPartialMatch) {
+        postBtn.classList.add('partially-posted');
+        logToDom("⚠️ Content is similar to an existing post");
+      }
+    }
+
+    async function fetchLatestPosts() {
+      const instance = document.getElementById("instance").value.trim();
+      const token = document.getElementById("apikey").value.trim();
+      
+      if (!instance || !token) {
+        logToDom("Cannot fetch posts - instance or API key missing");
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${instance}/api/v1/accounts/verify_credentials`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error("Failed to verify credentials");
+        }
+        
+        const accountData = await response.json();
+        const userId = accountData.id;
+        
+        const postsResponse = await fetch(`${instance}/api/v1/accounts/${userId}/statuses?limit=3`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        
+        if (!postsResponse.ok) {
+          throw new Error("Failed to fetch posts");
+        }
+        
+        const posts = await postsResponse.json();
+        latestPosts = posts.map(post => ({
+          id: post.id,
+          content: post.content.replace(/<[^>]*>/g, '') // Remove HTML tags for comparison
+        }));
+        
+        logToDom(`Fetched ${latestPosts.length} latest posts for comparison`);
+        updatePostButtonStatus();
+      } catch (err) {
+        logToDom("Error fetching posts: " + err.message);
+      }
+    }
+
+    window.onload = async () => {
+      logToDom("Page loaded");
+      const params = new URLSearchParams(window.location.search);
+      const apiKey = params.get("apikey");
+      const instance = params.get("instance");
+
+      if (apiKey) {
+        document.getElementById("apikey").value = apiKey;
+        localStorage.setItem("apikey", apiKey);
+        logToDom("API key from URL stored in localStorage");
+      }
+      if (instance) {
+        document.getElementById("instance").value = instance;
+        localStorage.setItem("instance", instance);
+        logToDom("Instance from URL stored in localStorage");
+      }
+
+      if (localStorage.getItem("apikey") && localStorage.getItem("instance")) {
+        document.getElementById("readBtn").style.display = "inline-block";
+        logToDom("LocalStorage found — showing Read button");
+      }
+
+      try {
+        const url = 'data_part_alcea.json?t=' + Date.now();
+        const res = await fetch(url);
+        const data = await res.json();
+
+        let latest = null;
+        for (let i = 0; i < data.length; i++) {
+          const entry = data[i];
+          const dateKey = Object.keys(entry)[0];
+          const valueObj = entry[dateKey];
+
+          if (
+            valueObj &&
+            typeof valueObj.value === "string" &&
+            valueObj.value.includes("•acws")
+          ) {
+            latest = valueObj.value;
+            break;
+          }
+        }
+
+        if (latest) {
+          document.getElementById("mainText").value = latest;
+          document.getElementById("hiddenText").innerText = latest;
+          logToDom("Loaded latest •acws entry from JSON");
+          
+          // Fetch latest posts for comparison
+          if (document.getElementById("instance").value && document.getElementById("apikey").value) {
+            await fetchLatestPosts();
+          }
+        } else {
+          logToDom("No •acws entry found in data_part_alcea.json");
+        }
+      } catch (err) {
+        logToDom("Error loading data_part_alcea.json: " + err.message);
+      }
+      
+      // Add event listeners for changes
+      document.getElementById("mainText").addEventListener('input', function() {
+        document.getElementById("hiddenText").innerText = this.value;
+        updatePostButtonStatus();
+      });
+      
+      document.getElementById("instance").addEventListener('change', fetchLatestPosts);
+      document.getElementById("apikey").addEventListener('change', fetchLatestPosts);
+    };
+
+    async function postToAkkoma() {
+      const postBtn = document.getElementById("postBtn");
+      if (postBtn.classList.contains('already-posted')) {
+        logToDom("⚠️ Not posting - exact match with existing content");
+        return;
+      }
+      
+      if (postBtn.classList.contains('partially-posted') && 
+          !confirm("Content is similar to existing posts. Post anyway?")) {
+        return;
+      }
+
+      const htmlMode = document.getElementById("htmlMode").checked;
+      const mfmMode = document.getElementById("mfmMode").checked;
+      const instance = document.getElementById("instance").value.trim();
+      const token = document.getElementById("apikey").value.trim();
+      let rawStatus = document.getElementById("mainText").value.trim();
+
+      if (htmlMode) {
+        rawStatus = rawStatus.replace(/\n/g, "<br>");
+      }
+
+      let status;
+      if (mfmMode) {
+        status = rawStatus.replace(/𒐫(.*?)𒐫/gs, "> $1");
+      } else {
+        status = rawStatus.replace(/𒐫(.*?)𒐫/gs, "<blockquote>$1</blockquote>");
+      }
+      
+      const preview = document.getElementById("hiddenText").innerText.slice(0, 33);
+
+      if (!instance || !token || !status) {
+        logToDom("❌ Missing instance, API key, or content");
+        return;
+      }
+
+      logToDom("Posting to Akkoma...");
+
+      try {
+        let contentType;
+        if (mfmMode) {
+          contentType = "text/x.misskeymarkdown";
+        } else if (htmlMode) {
+          contentType = "text/html";
+        } else {
+          contentType = "text/plain";
+        }
+
+        const postRes = await fetch(`${instance}/api/v1/statuses`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status,
+            content_type: contentType,
+          }),
+        });
+
+        if (!postRes.ok) {
+          const error = await postRes.json();
+          throw new Error(error.error || "Unknown posting error");
+        }
+
+        const postData = await postRes.json();
+        const postUrl = postData.url;
+        const now = new Date().toISOString();
+
+        const logObject = {
+          date: now,
+          url: postUrl,
+          preview: preview,
+          mode: mfmMode ? "mfm" : (htmlMode ? "html" : "plain"),
+          mediaType: contentType
+        };
+
+        document.getElementById("jsonPreview").innerText = JSON.stringify(
+          logObject,
+          null,
+          2
+        );
+        logToDom(`✅ Posted to Akkoma at: ${postUrl} (Content-Type: ${contentType})`);
+
+        await fetch("/other/extra/scripts/fakesocialmedia/0ld/save_post.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(logObject),
+        });
+
+        logToDom("📁 JSON sent to save_post.php");
+        
+        // Refresh latest posts after posting
+        await fetchLatestPosts();
+      } catch (err) {
+        logToDom("❌ Error: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
