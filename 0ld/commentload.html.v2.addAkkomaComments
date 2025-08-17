@@ -1,0 +1,378 @@
+<meta charset="UTF-8">
+<style>
+  body {
+    body{font-family:Arial,sans-serif;margin:0;padding:0}.container{max-width:800px;margin:0 auto;padding:20px}.post{background-color:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1);padding:20px;margin-bottom:20px}.content,.date{margin-bottom:10px}.date{color:#888;font-size:14px}.content{font-size:16px}.hashtags{font-size:14px;color:#555}.tag{margin-right:5px}a{color:pink;text-decoration:none}a:hover{text-decoration:underline}img{max-width:100%;height:auto}iframe{width:100%;height:315px;margin-top:10px;border:none}
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div id="results"></div>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      fetch('/other/extra/scripts/fakesocialmedia/data_alcea.json?v=' + Date.now())
+        .then(response => response.json())
+        .then(data => {
+          const urlParams2 = new URLSearchParams(window.location.search);
+          const queryText = urlParams2.get('text');
+          const urlParams = new URLSearchParams(window.location.search);
+          const number = urlParams.get('number') || 40;
+
+          const matches = data.slice(0, number).filter(entry => {
+            const date = Object.keys(entry)[0];
+            //return entry[date].value.includes(queryText);
+            return entry[date].value.toLowerCase().includes(queryText.toLowerCase());
+          });
+          const resultsContainer = document.getElementById('results');
+          if (resultsContainer) {
+            matches.forEach(match => {
+              const date = Object.keys(match)[0];
+              const user = "alcea";
+              const value = match[date].value;
+              const hashtags = match[date].hashtags.split(', ');
+              const postElement = document.createElement('div');
+              postElement.classList.add('post');
+              
+              // Get the original index from the data array
+              const originalIndex = data.indexOf(match);
+              const displayId = data.length - originalIndex; // Newest = highest number
+              
+              // Add ID display
+              const idElement = document.createElement('p');
+              idElement.classList.add('date');
+              idElement.textContent = `ID: ${displayId} • ${date}`;
+              postElement.appendChild(idElement);
+              
+              const valueElement = document.createElement('p');
+              valueElement.innerHTML = `<img src="https://alcea-wisteria.de/z_files/emoji/alcea.png" width="100px"><br>
+                @<a target="_blank" href="/fakesocialrender_limited.html?user=${user}" style="color:pink">${user}</a>: 
+                ${replaceEmojis(value).replace(/(https?:\/\/[^\s]+)/g, (match) => {
+                  if (match.includes('youtube.com') || match.includes('youtu.be')) {
+                    const videoId = getYouTubeVideoId(match);
+                    if (videoId) {
+                      return `<iframe src="https://www.youtube.com/embed/${videoId}" allowfullscreen></iframe>`;
+                    }
+                  }
+                  if (match.includes('pixiv.net')) {
+                    const pixivRegex = /https?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/(\d+)/;
+                    const pixivMatch = match.match(pixivRegex);
+                    if (pixivMatch) {
+                      const artworkId = pixivMatch[1];
+                      return `<div><img src="https://embed.pixiv.net/decorate.php?illust_id=${artworkId}&mode=sns-automator" width="50%"></div><br><a href="${match}" target="_blank">${match}</a>`;
+                    }
+                  }
+                  if (match.endsWith('.gif') || match.endsWith('.png') || match.endsWith('.webp') || match.endsWith('.jpg') || match.endsWith('.jpeg')) {
+                    let imageWidth = "50%";
+                    let imageElement = `<img src="${match}" width="${imageWidth}" alt="${match}">`;
+
+                    if (match.includes("emoji")) {
+                        imageWidth = "45px";
+                        imageElement = `<img src="${match}" width="${imageWidth}" alt="${match}">`;
+                        return imageElement;
+                    }
+
+                    return `${imageElement}<br><a href="${match}" target="_blank">${match}</a>`;
+                  }
+                  return `<a href="${match}" target="_blank">${match}</a>`;
+                }).replace(/\n/g, '<br>')}`;
+              postElement.appendChild(valueElement);
+
+              // Add the Akkoma integration code here
+              if (value.includes("•acws")) {
+                  async function safeFetchJson(url, retries = 3) {
+                      try {
+                          const res = await fetch(url, { cache: "no-store" });
+                          if (!res.ok) {
+                              throw new Error(`HTTP error ${res.status} (${res.statusText}) while fetching ${url}`);
+                          }
+                          const text = await res.text();
+                          if (text.length < 100) {
+                              throw new Error(`Fetched data is too short, possible incomplete response: ${text.length} bytes`);
+                          }
+                          try {
+                              const parsed = JSON.parse(text);
+                              if (Array.isArray(parsed)) {
+                                  return parsed;
+                              }
+                              if (parsed && Array.isArray(parsed.json)) {
+                                  return parsed.json;
+                              }
+                              throw new Error(`Unexpected JSON structure in ${url}`);
+                          } catch (err) {
+                              throw new Error(`JSON parsing failed for ${url}: ${err.message}`);
+                          }
+                      } catch (err) {
+                          if (retries > 0) {
+                              console.warn(`Fetch failed for ${url}, retrying... (${retries} retries left)\nReason: ${err.message}`);
+                              await new Promise(resolve => setTimeout(resolve, 1000));
+                              return safeFetchJson(url, retries - 1);
+                          } else {
+                              console.error("Fetch failed with no retries left:", err.message);
+                              throw err;
+                          }
+                      }
+                  }
+
+                  function normalizeLineBreaks(str) {
+                      return str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                  }
+                  function normalizeText(str) {
+                      return normalizeLineBreaks(str).normalize('NFC').trim();
+                  }
+                  function removeLineBreaks(str) {
+                      return normalizeText(str).replace(/\n/g, '');
+                  }
+                  function normalizeTextCompletely(str) {
+                      return str
+                          .replace(/\r\n|\r/g, '\n')
+                          .replace(/\s+/g, ' ')
+                          .replace(/^\s+|\s+$/g, '')
+                          .normalize('NFC');
+                  }
+
+                  safeFetchJson("/other/extra/scripts/fakesocialmedia/0ld/data_akkoma.json")
+                      .then(akkomaData => {
+                          if (!akkomaData) throw new Error("JSON parse failure");
+
+                          let matchedUrl = null;
+                          let matchedPreview = null;
+                          let matchType = null;
+
+                          const rawValue = value;
+                          const normValue = normalizeText(value);
+                          const noBreaksValue = removeLineBreaks(value);
+
+                          for (const akkoma of akkomaData) {
+                              if (!akkoma.preview) continue;
+                              const rawPreview = akkoma.preview;
+                              const normPreview = normalizeText(rawPreview);
+                              const noBreaksPreview = removeLineBreaks(rawPreview);
+
+                              if (rawValue.startsWith(rawPreview)) {
+                                  matchedUrl = akkoma.url;
+                                  matchedPreview = rawPreview;
+                                  matchType = 'raw';
+                                  break;
+                              }
+                              if (normValue.startsWith(normPreview)) {
+                                  matchedUrl = akkoma.url;
+                                  matchedPreview = rawPreview;
+                                  matchType = 'normalized';
+                                  break;
+                              }
+                              if (noBreaksValue.startsWith(noBreaksPreview)) {
+                                  matchedUrl = akkoma.url;
+                                  matchedPreview = rawPreview;
+                                  matchType = 'noBreaks';
+                                  break;
+                              }
+
+                              const maxOffset = 30;
+                              const indexInNorm = normValue.indexOf(normPreview);
+                              if (indexInNorm >= 0 && indexInNorm <= maxOffset) {
+                                  matchedUrl = akkoma.url;
+                                  matchedPreview = rawPreview;
+                                  matchType = 'loose';
+                                  break;
+                              }
+                          }
+
+                          if (!matchedUrl) {
+                              const normValueCompletely = normalizeTextCompletely(value);
+                              const maxOffset = 30;
+
+                              for (const akkoma of akkomaData) {
+                                  if (!akkoma.preview) continue;
+                                  const rawPreview = akkoma.preview;
+                                  const normPreviewCompletely = normalizeTextCompletely(rawPreview);
+
+                                  const indexInNormCompletely = normValueCompletely.indexOf(normPreviewCompletely);
+                                  if (indexInNormCompletely >= 0 && indexInNormCompletely <= maxOffset) {
+                                      matchedUrl = akkoma.url;
+                                      matchedPreview = rawPreview;
+                                      matchType = 'finalNormalized';
+                                      break;
+                                  }
+                              }
+                          }
+
+                          if (!matchedUrl) {
+                              for (const akkoma of akkomaData) {
+                                  if (!akkoma.preview) continue;
+                                  const rawPreview = akkoma.preview;
+                                  if (rawValue === rawPreview) {
+                                      matchedUrl = akkoma.url;
+                                      matchedPreview = rawPreview;
+                                      matchType = 'exact';
+                                      break;
+                                  }
+                              }
+                          }
+
+                          if (matchedUrl) {
+                              const container = document.createElement('span');
+                              const link = document.createElement('a');
+                              link.target = "_blank";
+                              link.classList.add('btn2');
+                              link.href = matchedUrl;
+                              link.textContent = "Permalink (match found)";
+
+                              const proof = document.createElement('div');
+                              proof.style.fontSize = '0em';
+                              proof.style.marginTop = '0px';
+
+                              switch (matchType) {
+                                  case 'raw':
+                                      proof.style.color = 'green';
+                                      proof.textContent = `✔ Match found on first try (raw):\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                      break;
+                                  case 'normalized':
+                                      proof.style.color = 'lightgreen';
+                                      proof.textContent = `✔ Match found after normalization:\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                      break;
+                                  case 'noBreaks':
+                                      proof.style.color = 'lightblue';
+                                      proof.textContent = `✔ Match found after removing line breaks:\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                      break;
+                                  case 'loose':
+                                      proof.style.color = 'orange';
+                                      proof.textContent = `✔ Loose match found (near start of post):\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                      break;
+                                  case 'finalNormalized':
+                                      proof.style.color = 'purple';
+                                      proof.textContent = `✔ Match found after final normalization:\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                      break;
+                                  case 'exact':
+                                      proof.style.color = 'blue';
+                                      proof.textContent = `✔ Exact match found:\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                      break;
+                              }
+
+                              container.appendChild(link);
+                              container.appendChild(proof);
+
+                              const iframeContainer = document.createElement('div');
+                              const iframe = document.createElement('iframe');
+                              iframe.src = `/other/extra/scripts/fakesocialmedia/replyhandler.html?url=${encodeURIComponent(matchedUrl)}`;
+                              iframe.style.border = 'none';
+                              iframe.style.height = '65px';
+                              iframe.style.width = '100%';
+                              iframe.style.overflow = 'auto';
+
+                              const iframeHeightText = document.createElement('div');
+                              iframeHeightText.style.marginTop = '10px';
+                              iframeHeightText.style.fontFamily = 'monospace';
+                              iframeHeightText.style.color = 'gray';
+                              iframeHeightText.textContent = "";
+
+                              iframe.onload = function () {
+                                  const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
+                                  function measureIframeHeight() {
+                                      const bodyHeight = iframeDocument.body.scrollHeight;
+                                      iframe.style.height = `${bodyHeight + 33}px`;
+                                  }
+                                  measureIframeHeight();
+                                  setInterval(measureIframeHeight, 3000);
+                              };
+
+                              iframeContainer.appendChild(iframe);
+                              container.appendChild(iframeContainer);
+                              container.appendChild(iframeHeightText);
+
+                              postElement.appendChild(container);
+                          }
+                      })
+                      .catch(err => {
+                          console.error("Fetch error:", err);
+
+                          const fallback = document.createElement('a');
+                          fallback.classList.add('btn2');
+                          fallback.href = "#";
+                          fallback.textContent = "Fetch error";
+
+                          const reason = document.createElement('div');
+                          reason.style.color = 'red';
+                          reason.style.fontFamily = 'monospace';
+                          reason.style.fontSize = '0.9em';
+                          reason.style.marginTop = '5px';
+                          reason.textContent = `❌ Reason: ${err.message}`;
+
+                          postElement.appendChild(fallback);
+                          postElement.appendChild(reason);
+                      });
+              }
+
+              const hashtagsElement = document.createElement('div');
+              hashtagsElement.classList.add('hashtags');
+              hashtags.forEach(tag => {
+                const tagElement = document.createElement('span');
+                tagElement.classList.add('tag');
+                tagElement.textContent = `#${tag}`;
+                hashtagsElement.appendChild(tagElement);
+              });
+              postElement.appendChild(hashtagsElement);
+
+              const buttonElement = document.createElement('button');
+              buttonElement.classList.add('btn');
+              const buttonText = value.slice(0, 25) || 'btn';
+              buttonElement.textContent = 'Comment';
+              buttonElement.addEventListener('click', () => {
+                  window.open(`/other/extra/scripts/fakesocialmedia/comment.php?text=${encodeURIComponent(buttonText)}`, '_blank');
+              });
+              postElement.appendChild(buttonElement);
+
+              resultsContainer.appendChild(postElement);
+            });
+          } else {
+            console.error('Error: Results container not found.');
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+        });
+    });
+    function replaceEmojis(text) {
+        return text.replace(/:(\w+):/g, (match, emoji) => {
+            return `https://alcea-wisteria.de/z_files/emoji/${emoji}.gif`;
+        });
+    }
+    function getYouTubeVideoId(url) {
+      const videoIdMatch = url.match(/(?:v=|\/(?:embed|v|shorts)\/|youtu\.be\/|vi\/)([a-zA-Z0-9_-]{11})/);
+      return videoIdMatch ? videoIdMatch[1] : null;
+    }
+  </script>
+
+<h2>Comments</h2>
+<div id="comments"></div>
+<script>
+  function fetchAndDisplayComments() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const text = (urlParams.get('text') || '').toString().toLowerCase().normalize();
+
+    const jsonUrl = '/other/extra/scripts/fakesocialmedia/comments.json?v=' + Date.now();
+
+    fetch(jsonUrl)
+      .then(response => response.json())
+      .then(data => {
+        const matchingComments = data.filter(comment => {
+          const commentText = (comment.text || '').toString().toLowerCase().normalize();
+          return commentText.includes(text);
+        });
+
+        const commentsDiv = document.getElementById('comments');
+        matchingComments.forEach(comment => {
+          const commentElement = document.createElement('div');
+          commentElement.textContent = comment.value;
+          commentsDiv.appendChild(commentElement);
+        });
+      })
+      .catch(error => {
+        console.error('Error fetching comments:', error);
+      });
+  }
+
+  window.onload = fetchAndDisplayComments;
+</script>
+</body>
+</html>
