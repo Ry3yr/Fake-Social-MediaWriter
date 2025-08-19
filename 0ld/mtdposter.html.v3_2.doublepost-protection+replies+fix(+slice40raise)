@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Akkoma Poster with CORS Proxy</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    h2 {
+      color: #2b6dad;
+      border-bottom: 2px solid #2b6dad;
+      padding-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: bold;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .checkbox-group {
+      margin: 15px 0;
+    }
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+    button {
+      background-color: #2b6dad;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 0;
+    }
+    button:hover {
+      background-color: #1a4d80;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    #hiddenText { display: none; }
+    #readBtn { 
+      display: none; 
+      margin-top: 5px; 
+      background-color: #6c757d;
+    }
+    #debugLog {
+      border: 1px solid #ccc;
+      background: #f9f9f9;
+      padding: 10px;
+      margin-top: 15px;
+      font-family: monospace;
+      font-size: 0.9em;
+      max-height: 250px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    #jsonPreview {
+      border: 1px solid #999;
+      background: #f0f0f0;
+      padding: 10px;
+      margin-top: 15px;
+      font-family: monospace;
+      font-size: 0.9em;
+      white-space: pre-wrap;
+    }
+    #duplicateWarning {
+      color: red;
+      font-weight: bold;
+      margin: 10px 0;
+      display: none;
+      padding: 10px;
+      background-color: #ffeeee;
+      border-radius: 4px;
+    }
+    .reply-notice {
+      color: #228B22;
+      font-weight: bold;
+      margin: 5px 0;
+      padding: 8px;
+      background-color: #f0fff0;
+      border-radius: 4px;
+    }
+    .reply-details {
+      margin-left: 20px;
+      font-size: 0.9em;
+      color: #666;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .mode-selector {
+      display: flex;
+      gap: 15px;
+      margin: 10px 0;
+    }
+    .status {
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .status.success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .status.error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .status.info {
+      background-color: #cce5ff;
+      color: #004085;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Akkoma Poster with CORS Proxy Support</h2>
+
+    <label>Instance URL:</label>
+    <input type="text" id="instance" placeholder="https://your.instance.tld" />
+    
+    <label>API Key:</label>
+    <input type="text" id="apikey" />
+    
+    <div class="mode-selector">
+      <label><input type="checkbox" id="htmlMode" checked onchange="toggleMode('html')" /> HTML mode</label>
+      <label><input type="checkbox" id="mfmMode" onchange="toggleMode('mfm')" /> MFM mode</label>
+    </div>
+    
+    <button id="readBtn" onclick="readFromStorage()">Read from Storage</button>
+  </div>
+
+  <div class="card">
+    <label>Post Content:</label>
+    <textarea id="mainText" rows="10" placeholder="Enter your post content here..."></textarea>
+    
+    <div id="duplicateWarning">This content has already been posted recently!</div>
+    <div id="replyNotice" class="reply-notice"></div>
+    
+    <button id="postButton" onclick="postToAkkoma()">Post to Akkoma</button>
+  </div>
+
+  <div id="hiddenText"></div>
+
+  <div class="card">
+    <h3>📦 JSON that will be saved:</h3>
+    <div id="jsonPreview" contenteditable="true">{}</div>
+  </div>
+
+  <div class="card">
+    <h3>🪵 Debug Log</h3>
+    <div id="debugLog"><strong>Debug Log:</strong><br /></div>
+  </div>
+
+  <script>
+    let detectedReplyUrl = null;
+    let currentUser = null;
+    let replyInfo = null;
+    const CORS_PROXY = "https://alceawis.com/cors.php?query=";
+
+    function logToDom(message) {
+      const logDiv = document.getElementById("debugLog");
+      const timestamp = new Date().toISOString();
+      logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function readFromStorage() {
+      const apiKey = localStorage.getItem("apikey");
+      const instance = localStorage.getItem("instance");
+      if (apiKey && instance) {
+        document.getElementById("apikey").value = apiKey;
+        document.getElementById("instance").value = instance;
+        logToDom("Read API key and instance from localStorage");
+      } else {
+        logToDom("No data found in localStorage");
+      }
+    }
+
+    function toggleMode(mode) {
+      const htmlMode = document.getElementById("htmlMode");
+      const mfmMode = document.getElementById("mfmMode");
+      if (mode === 'html') {
+        if (htmlMode.checked) mfmMode.checked = false;
+      } else if (mode === 'mfm') {
+        if (mfmMode.checked) htmlMode.checked = false;
+      }
+      logToDom(`Mode changed: ${mode} (HTML: ${htmlMode.checked}, MFM: ${mfmMode.checked})`);
+    }
+
+    async function fetchWithProxyFallback(url, options) {
+      try {
+        const response = await fetch(url, options);
+        if (response.ok) return response;
+        
+        // If direct request failed, try with CORS proxy
+        logToDom(`Direct request failed (${response.status}), trying with CORS proxy...`);
+        const proxyUrl = CORS_PROXY + encodeURIComponent(url);
+        return await fetch(proxyUrl, options);
+      } catch (error) {
+        logToDom(`Request failed: ${error.message}, trying with CORS proxy...`);
+        const proxyUrl = CORS_PROXY + encodeURIComponent(url);
+        return await fetch(proxyUrl, options);
+      }
+    }
+
+    async function fetchUserInfo(instance, token) {
+      try {
+        const url = `${instance}/api/v1/accounts/verify_credentials`;
+        const response = await fetchWithProxyFallback(url, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        return await response.json();
+      } catch (error) {
+        logToDom("Error fetching user info: " + error.message);
+        return null;
+      }
+    }
+
+    async function resolveReplyInfo(instance, token, replyUrl) {
+      try {
+        // First try /api/v2/search (preferred)
+        const searchUrl = `${instance}/api/v2/search?resolve=true&type=statuses&q=${encodeURIComponent(replyUrl)}`;
+        const v2 = await fetchWithProxyFallback(searchUrl, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (v2.ok) {
+          const data = await v2.json();
+          if (data.statuses && data.statuses.length > 0) {
+            const s = data.statuses[0];
+            const acct = s.account.acct;
+            const hostFromAcct = acct.includes("@") ? acct.split("@")[1] : (new URL(s.account.url)).hostname;
+            const fullHandle = acct.includes("@") ? acct : `${acct}@${hostFromAcct}`;
+            return {
+              localStatusId: s.id,
+              visibility: s.visibility || "public",
+              authorUrl: s.account.url,
+              fullHandle: `@${fullHandle}`,
+              authorAcct: fullHandle,
+              originalUrl: s.url || replyUrl,
+              context: s.uri || null,
+              conversation: s.uri || null
+            };
+          }
+        } else {
+          logToDom(`Search API failed: HTTP ${v2.status}`);
+        }
+
+        // If search failed, try to extract status ID and fetch directly
+        const statusIdMatch = replyUrl.match(/\/([^\/]+)$/);
+        if (statusIdMatch) {
+          const statusId = statusIdMatch[1];
+          logToDom(`Trying to fetch status directly using ID: ${statusId}`);
+          
+          const statusUrl = `${instance}/api/v1/statuses/${statusId}`;
+          const statusResponse = await fetchWithProxyFallback(statusUrl, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          if (statusResponse.ok) {
+            const s = await statusResponse.json();
+            const acct = s.account.acct;
+            const hostFromAcct = acct.includes("@") ? acct.split("@")[1] : (new URL(s.account.url)).hostname;
+            const fullHandle = acct.includes("@") ? acct : `${acct}@${hostFromAcct}`;
+            
+            return {
+              localStatusId: s.id,
+              visibility: s.visibility || "public",
+              authorUrl: s.account.url,
+              fullHandle: `@${fullHandle}`,
+              authorAcct: fullHandle,
+              originalUrl: s.url || replyUrl,
+              context: s.uri || null,
+              conversation: s.uri || null
+            };
+          } else {
+            logToDom(`Direct status fetch also failed: HTTP ${statusResponse.status}`);
+          }
+        }
+
+        // As last resort, parse handle from URL for UI only
+        const handleMatch = replyUrl.match(/https?:\/\/([^\/]+)\/@([^\/]+)/);
+        if (handleMatch) {
+          const domain = handleMatch[1];
+          const username = handleMatch[2];
+          return {
+            localStatusId: null,
+            visibility: "public",
+            authorUrl: `https://${domain}/users/${username}`,
+            fullHandle: `@${username}@${domain}`,
+            authorAcct: `${username}@${domain}`,
+            originalUrl: replyUrl,
+            context: null,
+            conversation: null
+          };
+        }
+
+        return null;
+      } catch (error) {
+        logToDom("Error resolving reply info: " + error.message);
+        return null;
+      }
+    }
+
+    async function checkForReply() {
+      const text = document.getElementById("mainText").value;
+      const replyNotice = document.getElementById("replyNotice");
+
+      const replyMatch = text.match(/💬"([^"]+)"#💬/) || text.match(/💬([^#]+)#💬/);
+      if (replyMatch) {
+        detectedReplyUrl = replyMatch[1];
+        const instance = document.getElementById("instance").value.trim();
+        const token = document.getElementById("apikey").value.trim();
+
+        // Try to resolve immediately if we have creds; otherwise just show the URL
+        replyInfo = (instance && token)
+          ? await resolveReplyInfo(instance, token, detectedReplyUrl)
+          : null;
+
+        if (replyInfo && replyInfo.fullHandle) {
+          replyNotice.innerHTML = `This is a reply to ${replyInfo.fullHandle}`;
+          logToDom(`Resolved reply to: ${replyInfo.fullHandle} (local id: ${replyInfo.localStatusId || "n/a"})`);
+        } else {
+          replyNotice.innerHTML = `This is a reply to: ${detectedReplyUrl}`;
+          logToDom(`Detected reply to: ${detectedReplyUrl}`);
+        }
+        return detectedReplyUrl;
+      } else {
+        detectedReplyUrl = null;
+        replyInfo = null;
+        replyNotice.innerHTML = "";
+        return null;
+      }
+    }
+
+    async function checkForDuplicates() {
+      try {
+        const response = await fetch('/other/extra/scripts/fakesocialmedia/0ld/data_akkoma.json?t=' + Date.now());
+        const recentPosts = await response.json();
+        const currentText = document.getElementById("hiddenText").innerText.trim();
+        const previewText = currentText.slice(0, 40);
+
+        logToDom(`Checking against ${recentPosts.length} recent posts...`);
+        const latestPosts = recentPosts.slice(0, 5);
+        let duplicateFound = false;
+
+        for (const post of latestPosts) {
+          if (currentText.includes(post.preview) || post.preview.includes(previewText)) {
+            duplicateFound = true;
+            logToDom(`⚠️ Duplicate found: ${post.preview} (posted at ${post.date})`);
+            break;
+          }
+        }
+
+        const postButton = document.getElementById("postButton");
+        const warningDiv = document.getElementById("duplicateWarning");
+
+        if (duplicateFound) {
+          postButton.disabled = false;
+          warningDiv.style.display = 'block';
+          logToDom("Post button disabled due to duplicate content");
+        } else {
+          postButton.disabled = false;
+          warningDiv.style.display = 'none';
+          logToDom("No duplicates found - posting enabled");
+        }
+      } catch (error) {
+        logToDom("Error checking for duplicates: " + error.message);
+      }
+    }
+
+    window.onload = async () => {
+      logToDom("Page loaded");
+      const params = new URLSearchParams(window.location.search);
+      const apiKey = params.get("apikey");
+      const instance = params.get("instance");
+
+      if (apiKey) {
+        document.getElementById("apikey").value = apiKey;
+        localStorage.setItem("apikey", apiKey);
+        logToDom("API key from URL stored in localStorage");
+      }
+      if (instance) {
+        document.getElementById("instance").value = instance;
+        localStorage.setItem("instance", instance);
+        logToDom("Instance from URL stored in localStorage");
+      }
+
+      if (localStorage.getItem("apikey") && localStorage.getItem("instance")) {
+        document.getElementById("readBtn").style.display = "inline-block";
+        logToDom("LocalStorage found — showing Read button");
+      }
+
+      try {
+        const url = 'data_part_alcea.json?t=' + Date.now();
+        const res = await fetch(url);
+        const data = await res.json();
+
+        let latest = null;
+        for (let i = 0; i < data.length; i++) {
+          const entry = data[i];
+          const dateKey = Object.keys(entry)[0];
+          const valueObj = entry[dateKey];
+          if (valueObj && typeof valueObj.value === "string" && valueObj.value.includes("•acws")) {
+            latest = valueObj.value;
+            break;
+          }
+        }
+
+        if (latest) {
+          document.getElementById("mainText").value = latest;
+          document.getElementById("hiddenText").innerText = latest;
+          logToDom("Loaded latest •acws entry from JSON");
+          await checkForReply();
+          await checkForDuplicates();
+        } else {
+          logToDom("No •acws entry found in data_part_alcea.json");
+        }
+      } catch (err) {
+        logToDom("Error loading data_part_alcea.json: " + err.message);
+      }
+
+      document.getElementById("mainText").addEventListener('input', async function() {
+        document.getElementById("hiddenText").innerText = this.value;
+        await checkForReply();
+        checkForDuplicates();
+      });
+    };
+
+    function ensureLeadingMention(text, mention) {
+      const trimmed = text.trimStart();
+      if (new RegExp(`^${mention.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(trimmed)) {
+        return text; // already present at start
+      }
+      if (trimmed.startsWith("@")) {
+        // Already starts with some mention; leave as-is
+        return text;
+      }
+      return `${mention} ${text}`;
+    }
+
+    async function postToAkkoma() {
+      const htmlMode = document.getElementById("htmlMode").checked;
+      const mfmMode = document.getElementById("mfmMode").checked;
+      const instance = document.getElementById("instance").value.trim();
+      const token = document.getElementById("apikey").value.trim();
+      let rawStatus = document.getElementById("mainText").value.trim();
+
+      await checkForReply();
+
+      // Strip the inline reply marker from the content body
+      const cleanedStatus = rawStatus.replace(/💬"([^"]+)"#💬|💬([^#]+)#💬/g, '').trim();
+
+      // Render mode transforms
+      if (htmlMode) {
+        rawStatus = cleanedStatus.replace(/\n/g, "<br>");
+      } else {
+        rawStatus = cleanedStatus;
+      }
+
+      let status;
+      if (mfmMode) {
+        status = rawStatus.replace(/𒐫(.*?)𒐫/gs, "> $1");
+      } else {
+        status = rawStatus.replace(/𒐫(.*?)𒐫/gs, "<blockquote>$1</blockquote>");
+      }
+
+      const preview = document.getElementById("hiddenText").innerText.slice(0, 40);
+
+      if (!instance || !token || !status) {
+        logToDom("❌ Missing instance, API key, or content");
+        return;
+      }
+
+      logToDom("Posting to Akkoma...");
+
+      try {
+        let contentType;
+        if (mfmMode) contentType = "text/x.misskeymarkdown";
+        else if (htmlMode) contentType = "text/html";
+        else contentType = "text/plain";
+
+        currentUser = await fetchUserInfo(instance, token);
+        if (!currentUser) throw new Error("Failed to fetch user information");
+
+        let inReplyToId = null;
+        let replyMention = null;
+
+        if (detectedReplyUrl) {
+          // Resolve remote URL to a LOCAL status id on *your* instance
+          replyInfo = await resolveReplyInfo(instance, token, detectedReplyUrl);
+          if (!replyInfo) {
+            throw new Error("Could not resolve reply target on local instance.");
+          }
+          inReplyToId = replyInfo.localStatusId;
+          replyMention = replyInfo.fullHandle || null;
+
+          // Ensure the author mention is present at the start
+          if (replyMention) {
+            status = ensureLeadingMention(status, replyMention);
+          }
+        }
+
+        // Build Mastodon/Akkoma-compatible payload
+        const postData = {
+          status,
+          visibility: replyInfo ? (replyInfo.visibility || "public") : "public",
+          in_reply_to_id: inReplyToId
+        };
+
+        // Pleroma/Akkoma extension for rich content types (kept if your instance supports it)
+        if (contentType) {
+          postData.content_type = contentType;
+        }
+
+        const postUrl = `${instance}/api/v1/statuses`;
+        const postRes = await fetchWithProxyFallback(postUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(postData),
+        });
+
+        if (!postRes.ok) {
+          let errBody = "";
+          try { errBody = await postRes.text(); } catch {}
+          throw new Error(`Posting failed (${postRes.status}): ${errBody}`);
+        }
+
+        const postDataResponse = await postRes.json();
+
+        // If server returned a Mastodon Status, it will have id/url/content etc.
+        const postUrlResponse = postDataResponse.url || postDataResponse.uri || "";
+        const now = new Date().toISOString();
+
+        const logObject = {
+          date: now,
+          url: postUrlResponse,
+          preview: preview,
+          mode: mfmMode ? "mfm" : (htmlMode ? "html" : "plain"),
+          mediaType: contentType,
+          isReply: !!detectedReplyUrl,
+          replyTo: detectedReplyUrl || null,
+          replyLocalId: inReplyToId || null,
+          mentionUsed: replyMention || null,
+          visibility: postData.visibility
+        };
+
+        document.getElementById("jsonPreview").innerText = JSON.stringify(logObject, null, 2);
+        logToDom(`✅ Posted. URL: ${postUrlResponse || "(no url in response)"} | reply to local id: ${inReplyToId}`);
+
+        await fetch("/other/extra/scripts/fakesocialmedia/0ld/save_post.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(logObject),
+        });
+
+        logToDom("📁 JSON sent to save_post.php");
+
+        detectedReplyUrl = null;
+        replyInfo = null;
+      } catch (err) {
+        logToDom("❌ Error: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
