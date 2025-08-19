@@ -367,7 +367,7 @@
         const response = await fetch('/other/extra/scripts/fakesocialmedia/0ld/data_akkoma.json?t=' + Date.now());
         const recentPosts = await response.json();
         const currentText = document.getElementById("hiddenText").innerText.trim();
-        const previewText = currentText.slice(0, 33);
+        const previewText = currentText.slice(0, 40);
 
         logToDom(`Checking against ${recentPosts.length} recent posts...`);
         const latestPosts = recentPosts.slice(0, 5);
@@ -385,7 +385,7 @@
         const warningDiv = document.getElementById("duplicateWarning");
 
         if (duplicateFound) {
-          postButton.disabled = true;
+          postButton.disabled = false;
           warningDiv.style.display = 'block';
           logToDom("Post button disabled due to duplicate content");
         } else {
@@ -494,7 +494,7 @@
         status = rawStatus.replace(/𒐫(.*?)𒐫/gs, "<blockquote>$1</blockquote>");
       }
 
-      const preview = document.getElementById("hiddenText").innerText.slice(0, 33);
+      const preview = document.getElementById("hiddenText").innerText.slice(0, 40);
 
       if (!instance || !token || !status) {
         logToDom("❌ Missing instance, API key, or content");
