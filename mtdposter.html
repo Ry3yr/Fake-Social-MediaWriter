@@ -32,19 +32,30 @@
       margin: 10px 0;
       display: none;
     }
+    .reply-notice {
+      color: #90EE90;
+      font-weight: bold;
+      margin: 5px 0;
+    }
+    .reply-details {
+      margin-left: 20px;
+      font-size: 0.9em;
+      color: #666;
+    }
   </style>
 </head>
 <body>
   <h2>Akkoma Poster</h2>
 
   <label>API Key: <input type="text" id="apikey" /></label><br />
-  <label>Instance URL: <input type="text" id="instance" /></label><br />
+  <label>Instance URL: <input type="text" id="instance" placeholder="https://your.instance.tld" /></label><br />
   <label><input type="checkbox" id="htmlMode" checked onchange="toggleMode('html')" /> HTML mode</label><br />
   <label><input type="checkbox" id="mfmMode" onchange="toggleMode('mfm')" /> MFM mode</label><br />
   <button id="readBtn" onclick="readFromStorage()">Read from Storage</button><br /><br />
 
   <textarea id="mainText" rows="10" cols="50"></textarea><br /><br />
   <div id="duplicateWarning">This content has already been posted recently!</div>
+  <div id="replyNotice" class="reply-notice"></div>
   <button id="postButton" onclick="postToAkkoma()">Post</button>
 
   <div id="hiddenText"></div>
@@ -56,6 +67,10 @@
   <div id="debugLog"><strong>Debug Log:</strong><br /></div>
 
   <script>
+    let detectedReplyUrl = null;
+    let currentUser = null;
+    let replyInfo = null;
+
     function logToDom(message) {
       const logDiv = document.getElementById("debugLog");
       const timestamp = new Date().toISOString();
@@ -78,45 +93,161 @@
     function toggleMode(mode) {
       const htmlMode = document.getElementById("htmlMode");
       const mfmMode = document.getElementById("mfmMode");
-      
       if (mode === 'html') {
-        if (htmlMode.checked) {
-          mfmMode.checked = false;
-        }
+        if (htmlMode.checked) mfmMode.checked = false;
       } else if (mode === 'mfm') {
-        if (mfmMode.checked) {
-          htmlMode.checked = false;
-        }
+        if (mfmMode.checked) htmlMode.checked = false;
       }
       logToDom(`Mode changed: ${mode} (HTML: ${htmlMode.checked}, MFM: ${mfmMode.checked})`);
+    }
+
+    async function fetchUserInfo(instance, token) {
+      try {
+        const response = await fetch(`${instance}/api/v1/accounts/verify_credentials`, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error("Failed to fetch user info");
+        return await response.json();
+      } catch (error) {
+        logToDom("Error fetching user info: " + error.message);
+        return null;
+      }
+    }
+
+    // --- IMPORTANT: resolve remote reply URL to a LOCAL status ID on *your* instance ---
+    async function resolveReplyInfo(instance, token, replyUrl) {
+      try {
+        // First try /api/v2/search (preferred)
+        const v2 = await fetch(`${instance}/api/v2/search?resolve=true&type=statuses&q=${encodeURIComponent(replyUrl)}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (v2.ok) {
+          const data = await v2.json();
+          if (data.statuses && data.statuses.length > 0) {
+            const s = data.statuses[0];
+            const acct = s.account.acct;
+            const hostFromAcct = acct.includes("@") ? acct.split("@")[1] : (new URL(s.account.url)).hostname;
+            const fullHandle = acct.includes("@") ? acct : `${acct}@${hostFromAcct}`;
+            return {
+              localStatusId: s.id,            // <-- Use THIS for in_reply_to_id
+              visibility: s.visibility || "public",
+              authorUrl: s.account.url,
+              fullHandle: `@${fullHandle}`,
+              authorAcct: fullHandle,
+              originalUrl: s.url || replyUrl,
+              context: s.uri || null,
+              conversation: s.uri || null
+            };
+          }
+        } else {
+          logToDom(`/api/v2/search failed: HTTP ${v2.status}`);
+        }
+
+        // Fallback to /api/v1/search
+        const v1 = await fetch(`${instance}/api/v1/search?resolve=true&q=${encodeURIComponent(replyUrl)}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (v1.ok) {
+          const data1 = await v1.json();
+          const arr = data1.statuses || data1.results || [];
+          if (arr.length > 0) {
+            const s = arr[0];
+            const acct = s.account.acct;
+            const hostFromAcct = acct.includes("@") ? acct.split("@")[1] : (new URL(s.account.url)).hostname;
+            const fullHandle = acct.includes("@") ? acct : `${acct}@${hostFromAcct}`;
+            return {
+              localStatusId: s.id,
+              visibility: s.visibility || "public",
+              authorUrl: s.account.url,
+              fullHandle: `@${fullHandle}`,
+              authorAcct: fullHandle,
+              originalUrl: s.url || replyUrl,
+              context: s.uri || null,
+              conversation: s.uri || null
+            };
+          }
+        } else {
+          logToDom(`/api/v1/search failed: HTTP ${v1.status}`);
+        }
+
+        // As last resort, parse handle from URL for UI only
+        const handleMatch = replyUrl.match(/https?:\/\/([^\/]+)\/@([^\/]+)/);
+        if (handleMatch) {
+          const domain = handleMatch[1];
+          const username = handleMatch[2];
+          return {
+            localStatusId: null,
+            visibility: "public",
+            authorUrl: `https://${domain}/users/${username}`,
+            fullHandle: `@${username}@${domain}`,
+            authorAcct: `${username}@${domain}`,
+            originalUrl: replyUrl,
+            context: null,
+            conversation: null
+          };
+        }
+
+        return null;
+      } catch (error) {
+        logToDom("Error resolving reply info: " + error.message);
+        return null;
+      }
+    }
+
+    async function checkForReply() {
+      const text = document.getElementById("mainText").value;
+      const replyNotice = document.getElementById("replyNotice");
+
+      const replyMatch = text.match(/💬"([^"]+)"#💬/) || text.match(/💬([^#]+)#💬/);
+      if (replyMatch) {
+        detectedReplyUrl = replyMatch[1];
+        const instance = document.getElementById("instance").value.trim();
+        const token = document.getElementById("apikey").value.trim();
+
+        // Try to resolve immediately if we have creds; otherwise just show the URL
+        replyInfo = (instance && token)
+          ? await resolveReplyInfo(instance, token, detectedReplyUrl)
+          : null;
+
+        if (replyInfo && replyInfo.fullHandle) {
+          replyNotice.innerHTML = `This is a reply to ${replyInfo.fullHandle}`;
+          logToDom(`Resolved reply to: ${replyInfo.fullHandle} (local id: ${replyInfo.localStatusId || "n/a"})`);
+        } else {
+          replyNotice.innerHTML = `This is a reply to: ${detectedReplyUrl}`;
+          logToDom(`Detected reply to: ${detectedReplyUrl}`);
+        }
+        return detectedReplyUrl;
+      } else {
+        detectedReplyUrl = null;
+        replyInfo = null;
+        replyNotice.innerHTML = "";
+        return null;
+      }
     }
 
     async function checkForDuplicates() {
       try {
         const response = await fetch('/other/extra/scripts/fakesocialmedia/0ld/data_akkoma.json?t=' + Date.now());
         const recentPosts = await response.json();
-        
         const currentText = document.getElementById("hiddenText").innerText.trim();
         const previewText = currentText.slice(0, 33);
-        
+
         logToDom(`Checking against ${recentPosts.length} recent posts...`);
-        
-        // Check the latest 5 entries
         const latestPosts = recentPosts.slice(0, 5);
         let duplicateFound = false;
-        
+
         for (const post of latestPosts) {
-          // Compare both the full text and the preview
           if (currentText.includes(post.preview) || post.preview.includes(previewText)) {
             duplicateFound = true;
             logToDom(`⚠️ Duplicate found: ${post.preview} (posted at ${post.date})`);
             break;
           }
         }
-        
+
         const postButton = document.getElementById("postButton");
         const warningDiv = document.getElementById("duplicateWarning");
-        
+
         if (duplicateFound) {
           postButton.disabled = true;
           warningDiv.style.display = 'block';
@@ -163,12 +294,7 @@
           const entry = data[i];
           const dateKey = Object.keys(entry)[0];
           const valueObj = entry[dateKey];
-
-          if (
-            valueObj &&
-            typeof valueObj.value === "string" &&
-            valueObj.value.includes("•acws")
-          ) {
+          if (valueObj && typeof valueObj.value === "string" && valueObj.value.includes("•acws")) {
             latest = valueObj.value;
             break;
           }
@@ -178,8 +304,7 @@
           document.getElementById("mainText").value = latest;
           document.getElementById("hiddenText").innerText = latest;
           logToDom("Loaded latest •acws entry from JSON");
-          
-          // Check for duplicates after loading the text
+          await checkForReply();
           await checkForDuplicates();
         } else {
           logToDom("No •acws entry found in data_part_alcea.json");
@@ -187,13 +312,25 @@
       } catch (err) {
         logToDom("Error loading data_part_alcea.json: " + err.message);
       }
-      
-      // Add event listener to check for duplicates when text changes
-      document.getElementById("mainText").addEventListener('input', function() {
+
+      document.getElementById("mainText").addEventListener('input', async function() {
         document.getElementById("hiddenText").innerText = this.value;
+        await checkForReply();
         checkForDuplicates();
       });
     };
+
+    function ensureLeadingMention(text, mention) {
+      const trimmed = text.trimStart();
+      if (new RegExp(`^${mention.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(trimmed)) {
+        return text; // already present at start
+      }
+      if (trimmed.startsWith("@")) {
+        // Already starts with some mention; leave as-is
+        return text;
+      }
+      return `${mention} ${text}`;
+    }
 
     async function postToAkkoma() {
       const htmlMode = document.getElementById("htmlMode").checked;
@@ -202,8 +339,16 @@
       const token = document.getElementById("apikey").value.trim();
       let rawStatus = document.getElementById("mainText").value.trim();
 
+      await checkForReply();
+
+      // Strip the inline reply marker from the content body
+      const cleanedStatus = rawStatus.replace(/💬"([^"]+)"#💬|💬([^#]+)#💬/g, '').trim();
+
+      // Render mode transforms
       if (htmlMode) {
-        rawStatus = rawStatus.replace(/\n/g, "<br>");
+        rawStatus = cleanedStatus.replace(/\n/g, "<br>");
+      } else {
+        rawStatus = cleanedStatus;
       }
 
       let status;
@@ -212,7 +357,7 @@
       } else {
         status = rawStatus.replace(/𒐫(.*?)𒐫/gs, "<blockquote>$1</blockquote>");
       }
-      
+
       const preview = document.getElementById("hiddenText").innerText.slice(0, 33);
 
       if (!instance || !token || !status) {
@@ -224,12 +369,41 @@
 
       try {
         let contentType;
-        if (mfmMode) {
-          contentType = "text/x.misskeymarkdown";  // Updated to correct MFM media type
-        } else if (htmlMode) {
-          contentType = "text/html";
-        } else {
-          contentType = "text/plain";
+        if (mfmMode) contentType = "text/x.misskeymarkdown";
+        else if (htmlMode) contentType = "text/html";
+        else contentType = "text/plain";
+
+        currentUser = await fetchUserInfo(instance, token);
+        if (!currentUser) throw new Error("Failed to fetch user information");
+
+        let inReplyToId = null;
+        let replyMention = null;
+
+        if (detectedReplyUrl) {
+          // Resolve remote URL to a LOCAL status id on *your* instance
+          replyInfo = await resolveReplyInfo(instance, token, detectedReplyUrl);
+          if (!replyInfo || !replyInfo.localStatusId) {
+            throw new Error("Could not resolve reply target on local instance (no localStatusId).");
+          }
+          inReplyToId = replyInfo.localStatusId;
+          replyMention = replyInfo.fullHandle || null;
+
+          // Ensure the author mention is present at the start
+          if (replyMention) {
+            status = ensureLeadingMention(status, replyMention);
+          }
+        }
+
+        // Build Mastodon/Akkoma-compatible payload
+        const postData = {
+          status,
+          visibility: replyInfo ? (replyInfo.visibility || "public") : "public",
+          in_reply_to_id: inReplyToId
+        };
+
+        // Pleroma/Akkoma extension for rich content types (kept if your instance supports it)
+        if (contentType) {
+          postData.content_type = contentType;
         }
 
         const postRes = await fetch(`${instance}/api/v1/statuses`, {
@@ -238,19 +412,19 @@
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            status,
-            content_type: contentType,
-          }),
+          body: JSON.stringify(postData),
         });
 
         if (!postRes.ok) {
-          const error = await postRes.json();
-          throw new Error(error.error || "Unknown posting error");
+          let errBody = "";
+          try { errBody = await postRes.text(); } catch {}
+          throw new Error(`Posting failed (${postRes.status}): ${errBody}`);
         }
 
-        const postData = await postRes.json();
-        const postUrl = postData.url;
+        const postDataResponse = await postRes.json();
+
+        // If server returned a Mastodon Status, it will have id/url/content etc.
+        const postUrl = postDataResponse.url || postDataResponse.uri || "";
         const now = new Date().toISOString();
 
         const logObject = {
@@ -258,15 +432,16 @@
           url: postUrl,
           preview: preview,
           mode: mfmMode ? "mfm" : (htmlMode ? "html" : "plain"),
-          mediaType: contentType  // Include the actual media type used
+          mediaType: contentType,
+          isReply: !!detectedReplyUrl,
+          replyTo: detectedReplyUrl || null,
+          replyLocalId: inReplyToId || null,
+          mentionUsed: replyMention || null,
+          visibility: postData.visibility
         };
 
-        document.getElementById("jsonPreview").innerText = JSON.stringify(
-          logObject,
-          null,
-          2
-        );
-        logToDom(`✅ Posted to Akkoma at: ${postUrl} (Content-Type: ${contentType})`);
+        document.getElementById("jsonPreview").innerText = JSON.stringify(logObject, null, 2);
+        logToDom(`✅ Posted. URL: ${postUrl || "(no url in response)"} | reply to local id: ${inReplyToId}`);
 
         await fetch("/other/extra/scripts/fakesocialmedia/0ld/save_post.php", {
           method: "POST",
@@ -275,6 +450,9 @@
         });
 
         logToDom("📁 JSON sent to save_post.php");
+
+        detectedReplyUrl = null;
+        replyInfo = null;
       } catch (err) {
         logToDom("❌ Error: " + err.message);
       }
