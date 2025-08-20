@@ -134,7 +134,7 @@
 
     const user = getQueryParam('user');
     if (user) {
-        const jsonFile = `data${all}_${user}.json?t=${Date.now()}`;
+        const jsonFile = `/other/extra/scripts/fakesocialmedia/data${all}_${user}.json?t=${Date.now()}`;
         console.log(jsonFile); 
         let myDiv = document.getElementById("jsonloaded");
         myDiv.textContent = jsonFile;
@@ -437,7 +437,7 @@
                         postElement.appendChild(hashtagsElement);
                         const buttonElement = document.createElement('button');
                         buttonElement.classList.add('btn');
-                        const buttonText = value.slice(0, 25) || 'btn';
+                        const buttonText = value.slice(0, 40) || 'btn';
                         buttonElement.textContent = 'Comment';
                         buttonElement.addEventListener('click', () => {
                             window.open(`/other/extra/scripts/fakesocialmedia/comment.php?text=${encodeURIComponent(buttonText)}`, '_blank');
@@ -446,7 +446,7 @@
                         
                         const buttonElement2 = document.createElement('a');
                         buttonElement2.classList.add('btn2');
-                        const buttonText2 = value.slice(0, 25) || 'btn';
+                        const buttonText2 = value.slice(0, 40) || 'btn';
                         buttonElement2.textContent = '(load comments)';
                         buttonElement2.href = `/other/extra/scripts/fakesocialmedia/commentload.html?number=40&text=${encodeURIComponent(buttonText2)}`;
                         buttonElement2.target = "_blank";
