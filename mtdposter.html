@@ -6,7 +6,7 @@
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      max-width: 800px;
+      max-width: 1200px;
       margin: 0 auto;
       padding: 20px;
       background-color: #f5f5f5;
@@ -57,7 +57,6 @@
       background-color: #cccccc;
       cursor: not-allowed;
     }
-    #hiddenText { display: none; }
     #readBtn { 
       display: none; 
       margin-top: 5px; 
@@ -135,6 +134,23 @@
       background-color: #cce5ff;
       color: #004085;
     }
+    .textboxes-container {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 15px;
+    }
+    .textbox-wrapper {
+      flex: 1;
+    }
+    .textbox-wrapper h3 {
+      margin-top: 0;
+      color: #2b6dad;
+    }
+    #hiddenText {
+      opacity: 0.3;
+      background-color: #f9f9f9;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -156,16 +172,22 @@
   </div>
 
   <div class="card">
-    <label>Post Content:</label>
-    <textarea id="mainText" rows="10" placeholder="Enter your post content here..."></textarea>
+    <div class="textboxes-container">
+      <div class="textbox-wrapper">
+        <h3>Post Content (Will be sent):</h3>
+        <textarea id="mainText" rows="10" placeholder="Enter your post content here..."></textarea>
+      </div>
+      <div class="textbox-wrapper">
+        <h3>Hidden Content (For JSON - Unchanged):</h3>
+        <textarea id="hiddenText" rows="10" readonly></textarea>
+      </div>
+    </div>
     
     <div id="duplicateWarning">This content has already been posted recently!</div>
     <div id="replyNotice" class="reply-notice"></div>
     
     <button id="postButton" onclick="postToAkkoma()">Post to Akkoma</button>
   </div>
-
-  <div id="hiddenText"></div>
 
   <div class="card">
     <h3>📦 JSON that will be saved:</h3>
@@ -366,7 +388,7 @@
       try {
         const response = await fetch('/other/extra/scripts/fakesocialmedia/0ld/data_akkoma.json?t=' + Date.now());
         const recentPosts = await response.json();
-        const currentText = document.getElementById("hiddenText").innerText.trim();
+        const currentText = document.getElementById("hiddenText").value.trim();
         const previewText = currentText.slice(0, 40);
 
         logToDom(`Checking against ${recentPosts.length} recent posts...`);
@@ -438,7 +460,7 @@
 
         if (latest) {
           document.getElementById("mainText").value = latest;
-          document.getElementById("hiddenText").innerText = latest;
+          document.getElementById("hiddenText").value = latest;
           logToDom("Loaded latest •acws entry from JSON");
           await checkForReply();
           await checkForDuplicates();
@@ -450,7 +472,7 @@
       }
 
       document.getElementById("mainText").addEventListener('input', async function() {
-        document.getElementById("hiddenText").innerText = this.value;
+        // REMOVED: No longer updating hiddenText when mainText changes
         await checkForReply();
         checkForDuplicates();
       });
@@ -473,30 +495,14 @@
       const mfmMode = document.getElementById("mfmMode").checked;
       const instance = document.getElementById("instance").value.trim();
       const token = document.getElementById("apikey").value.trim();
+      
+      // Get the text from the TEXTAREA (what will be sent)
       let rawStatus = document.getElementById("mainText").value.trim();
+      
+      // Get the preview from the HIDDEN TEXTAREA (for JSON)
+      const preview = document.getElementById("hiddenText").value.slice(0, 40);
 
-      await checkForReply();
-
-      // Strip the inline reply marker from the content body
-      const cleanedStatus = rawStatus.replace(/💬"([^"]+)"#💬|💬([^#]+)#💬/g, '').trim();
-
-      // Render mode transforms
-      if (htmlMode) {
-        rawStatus = cleanedStatus.replace(/\n/g, "<br>");
-      } else {
-        rawStatus = cleanedStatus;
-      }
-
-      let status;
-      if (mfmMode) {
-        status = rawStatus.replace(/𒐫(.*?)𒐫/gs, "> $1");
-      } else {
-        status = rawStatus.replace(/𒐫(.*?)𒐫/gs, "<blockquote>$1</blockquote>");
-      }
-
-      const preview = document.getElementById("hiddenText").innerText.slice(0, 40);
-
-      if (!instance || !token || !status) {
+      if (!instance || !token || !rawStatus) {
         logToDom("❌ Missing instance, API key, or content");
         return;
       }
@@ -511,6 +517,25 @@
 
         currentUser = await fetchUserInfo(instance, token);
         if (!currentUser) throw new Error("Failed to fetch user information");
+
+        await checkForReply();
+
+        // Strip the inline reply marker from the content body
+        const cleanedStatus = rawStatus.replace(/💬"([^"]+)"#💬|💬([^#]+)#💬/g, '').trim();
+
+        // Render mode transforms
+        if (htmlMode) {
+          rawStatus = cleanedStatus.replace(/\n/g, "<br>");
+        } else {
+          rawStatus = cleanedStatus;
+        }
+
+        let status;
+        if (mfmMode) {
+          status = rawStatus.replace(/𒐫(.*?)𒐫/gs, "> $1");
+        } else {
+          status = rawStatus.replace(/𒐫(.*?)𒐫/gs, "<blockquote>$1</blockquote>");
+        }
 
         let inReplyToId = null;
         let replyMention = null;
