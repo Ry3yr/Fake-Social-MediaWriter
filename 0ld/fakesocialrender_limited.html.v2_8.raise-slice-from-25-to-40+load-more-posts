@@ -1,0 +1,623 @@
+<!---Twitter-esque--aesthetic-->
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f5f8fa;
+    }
+
+    .post {
+        background-color: white;
+        border: 1px solid #ccd6dd;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+        max-width: 600px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .post img {
+        border-radius: 5%;
+        vertical-align: middle;
+        margin-bottom: 10px;
+    }
+
+    .post a {
+        color: #1da1f2;
+        text-decoration: none;
+    }
+
+    .post a:hover {
+        text-decoration: underline;
+    }
+
+    .post p {
+        margin: 10px 0;
+        color: #14171a;
+        font-size: 15px;
+        line-height: 1.5;
+    }
+
+    .btn, .btn2 {
+        background-color: #1da1f2;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 9999px;
+        cursor: pointer;
+        margin-right: 10px;
+        font-size: 14px;
+        margin-top: 10px;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn2 {
+        background-color: #657786;
+    }
+
+    .btn:hover, .btn2:hover {
+        opacity: 0.9;
+    }
+
+    .post iframe {
+        margin-top: 10px;
+        border-radius: 8px;
+    }
+
+    blockquote {
+        border-left: 4px solid #657786;
+        background-color: #f5f8fa;
+        padding: 10px;
+        margin: 10px 0;
+        font-style: italic;
+        color: #657786;
+    }
+
+    #loadMoreBtn {
+        background-color: #1da1f2;
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 9999px;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 20px auto;
+        display: block;
+        max-width: 200px;
+        text-align: center;
+        transition: background-color 0.2s;
+    }
+
+    #loadMoreBtn:hover {
+        background-color: #1a91da;
+    }
+
+    #loadMoreBtn:disabled {
+        background-color: #ccd6dd;
+        cursor: not-allowed;
+    }
+
+    .loading {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    .controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 10px;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        max-width: 600px;
+    }
+
+    .limit-info {
+        font-size: 14px;
+        color: #657786;
+    }
+</style>
+
+<script src="other/extra/scripts/libraries/crypto-js.min.js"></script>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitter-style Timeline</title>
+</head>
+<body>
+<details><summary>-</summary>
+    <div class="controls">
+        <div class="limit-info">Initial limit: <span id="limitValue">15</span> posts</div>
+        <a href="?user=alcea&limit=3" class="btn2">View 3 Posts</a>
+        <a href="?user=alcea&limit=10" class="btn2">View 10 Posts</a>
+        <a href="?user=alcea" class="btn">Default (15)</a>
+    </div></details>
+    
+    <div id="errorLog"></div>
+    <div id="jsonloaded"></div>
+    
+    <!--Search-->
+    <form action="/other/extra/scripts/fakesocialmedia/commentload.html" method="get" target="_blank" style="margin-bottom: 20px; max-width: 600px;">
+        <input type="text" id="keyword" name="text" required placeholder="Search posts..." style="padding: 8px; width: 70%; border: 1px solid #ccd6dd; border-radius: 4px;">
+        <input type="hidden" name="number" value="4000">
+        <button type="submit" style="padding: 8px 16px; background-color: #1da1f2; color: white; border: none; border-radius: 4px; cursor: pointer;">Search</button>
+    </form>
+    
+    <div id="containerfakesocialmedia"></div>
+    <button id="loadMoreBtn" style="display: none;">Load More</button>
+
+    <script>
+    // Global variables to manage post loading state
+    let currentOffset = 0;
+    let allPosts = [];
+    let postsPerLoad = 15;
+    const urlParams = new URLSearchParams(window.location.search);
+    let limit = urlParams.get("limit") || "15";
+    const baseurl = "https://alcea-wisteria.de/z_files/emoji";
+    const errorLogDiv = document.getElementById('errorLog');
+    const loadMoreBtn = document.getElementById('loadMoreBtn');
+    const container = document.getElementById('containerfakesocialmedia');
+    const limitValueSpan = document.getElementById('limitValue');
+
+    // Update the limit display
+    limitValueSpan.textContent = limit;
+
+    function getQueryParam(param) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(param);
+    }
+
+    function logError(message) {
+        const errorMessage = document.createElement('p');
+        errorMessage.textContent = message;
+        errorLogDiv.appendChild(errorMessage);
+
+        const fixLink = document.createElement('a');
+        fixLink.textContent = 'Fix!';
+        fixLink.target = '_blank';
+        fixLink.href = '/other/extra/scripts/fakesocialmedia/fix.php';
+        fixLink.style.color = 'pink';
+        errorLogDiv.appendChild(fixLink);
+
+        const commonIssuesLink = document.createElement('a');
+        commonIssuesLink.textContent = '- Common Issues';
+        commonIssuesLink.target = '_blank';
+        commonIssuesLink.href = 'https://ry3yr.github.io/fakesocialmediatimelineissue.html';
+        commonIssuesLink.style.color = 'blue';
+        errorLogDiv.appendChild(commonIssuesLink);
+    }
+
+    let all = "";
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("all") === "yes") {
+        all = "";
+    } else {
+        all = "_part";
+    }
+
+    // Function to create a post element
+    function createPostElement(obj) {
+        const date = Object.keys(obj)[0];
+        const innerObj = obj[date];
+        const value = innerObj.value;
+        const hashtags = innerObj.hashtags;
+        const postElement = document.createElement('div');
+        postElement.classList.add('post');
+        const dateElement = document.createElement('p');
+        dateElement.innerHTML = `<hr>Date: ${date}`;
+        const valueElement = document.createElement('p');
+        const valueWithoutQuotes = value.replace(/𒐫[\s\S]*?𒐫/g, ''); // Removes 𒐫...𒐫 block
+        
+        valueElement.innerHTML = `<img src=https://alcea-wisteria.de/z_files/emoji/${user}.png width=100px><br>@<a target="_blank" href="/fakesocialrender_limited.html?user=${user}" style="color:pink">${user}</a>: ${replaceEmojis(valueWithoutQuotes)
+            .replace(/(<a\s[^>]*>.*?<\/a>)|(https?:\/\/[^\s]+)/g, (match, anchorTag, plainUrl) => {
+                // If it's already an anchor tag, return it as-is
+                if (anchorTag) {
+                    return anchorTag;
+                }
+                
+                // Handle plain URLs
+                if (plainUrl) {
+                    if (plainUrl.includes('pixiv.net')) {
+                        const pixivRegex = /https?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/(\d+)/;
+                        const pixivMatch = plainUrl.match(pixivRegex);
+                        if (pixivMatch) {
+                            const artworkId = pixivMatch[1];
+                            return `<div><img src="https://embed.pixiv.net/decorate.php?illust_id=${artworkId}&mode=sns-automator" width="50%"></div><br><a href="${plainUrl}" target="_blank">${plainUrl}</a>`;
+                        }
+                    }
+                    if (plainUrl.endsWith('.gif') || plainUrl.endsWith('.png') || plainUrl.endsWith('.webp') || plainUrl.endsWith('.jpg') || plainUrl.endsWith('.jpeg')) {
+                        let imageWidth = "50%";
+                        if (plainUrl.includes("emoji")) {
+                            imageWidth = "45px";
+                        }
+                        const imageElement = `<img src="${plainUrl}" width="${imageWidth}" alt="${plainUrl}">`;
+                        if (plainUrl.includes(`${baseurl}`)) {
+                            return imageElement;
+                        } else {
+                            return `${imageElement}<br><a href="${plainUrl}" target="_blank">${plainUrl}</a>`;
+                        }
+                    }
+                    return `<a href="${plainUrl}" target="_blank">${plainUrl}</a>`;
+                }
+                return match;
+            })
+            .replace(/\n/g, '<br>')}`;
+
+        const hashtagsElement = document.createElement('p');
+        hashtagsElement.textContent = `Hashtags: ${hashtags}`;
+        postElement.appendChild(dateElement);
+        postElement.appendChild(valueElement);
+
+        //quote function
+        const quoteRegex = /𒐫([\s\S]*?)𒐫/g;
+        let match;
+        while ((match = quoteRegex.exec(value)) !== null) {
+            const quoteBlock = document.createElement('div');
+            quoteBlock.style.borderLeft = '4px solid #ccc';
+            quoteBlock.style.padding = '10px';
+            quoteBlock.style.backgroundColor = '#f9f9f9';
+            const formattedQuote = match[1].replace(/\n/g, '<br>');
+            quoteBlock.innerHTML = formattedQuote.trim();
+            postElement.appendChild(quoteBlock);
+        }
+
+        // link2acws-akkoma integration
+        if (value.includes("•acws")) {
+            async function safeFetchJson(url, retries = 3) {
+                try {
+                    const res = await fetch(url, { cache: "no-store" });
+                    if (!res.ok) {
+                        throw new Error(`HTTP error ${res.status} (${res.statusText}) while fetching ${url}`);
+                    }
+                    const text = await res.text();
+                    if (text.length < 100) {
+                        throw new Error(`Fetched data is too short, possible incomplete response: ${text.length} bytes`);
+                    }
+                    try {
+                        const parsed = JSON.parse(text);
+                        if (Array.isArray(parsed)) {
+                            return parsed;
+                        }
+                        if (parsed && Array.isArray(parsed.json)) {
+                            return parsed.json;
+                        }
+                        throw new Error(`Unexpected JSON structure in ${url}`);
+                    } catch (err) {
+                        throw new Error(`JSON parsing failed for ${url}: ${err.message}`);
+                    }
+                } catch (err) {
+                    if (retries > 0) {
+                        console.warn(`Fetch failed for ${url}, retrying... (${retries} retries left)\nReason: ${err.message}`);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        return safeFetchJson(url, retries - 1);
+                    } else {
+                        console.error("Fetch failed with no retries left:", err.message);
+                        throw err;
+                    }
+                }
+            }
+
+            function normalizeLineBreaks(str) {
+                return str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            }
+            function normalizeText(str) {
+                return normalizeLineBreaks(str).normalize('NFC').trim();
+            }
+            function removeLineBreaks(str) {
+                return normalizeText(str).replace(/\n/g, '');
+            }
+            function normalizeTextCompletely(str) {
+                return str
+                    .replace(/\r\n|\r/g, '\n')
+                    .replace(/\s+/g, ' ')
+                    .replace(/^\s+|\s+$/g, '')
+                    .normalize('NFC');
+            }
+
+            safeFetchJson("/other/extra/scripts/fakesocialmedia/0ld/data_akkoma.json")
+                .then(akkomaData => {
+                    if (!akkomaData) throw new Error("JSON parse failure");
+
+                    let matchedUrl = null;
+                    let matchedPreview = null;
+                    let matchType = null;
+
+                    const rawValue = value;
+                    const normValue = normalizeText(value);
+                    const noBreaksValue = removeLineBreaks(value);
+
+                    for (const akkoma of akkomaData) {
+                        if (!akkoma.preview) continue;
+                        const rawPreview = akkoma.preview;
+                        const normPreview = normalizeText(rawPreview);
+                        const noBreaksPreview = removeLineBreaks(rawPreview);
+
+                        if (rawValue.startsWith(rawPreview)) {
+                            matchedUrl = akkoma.url;
+                            matchedPreview = rawPreview;
+                            matchType = 'raw';
+                            break;
+                        }
+                        if (normValue.startsWith(normPreview)) {
+                            matchedUrl = akkoma.url;
+                            matchedPreview = rawPreview;
+                            matchType = 'normalized';
+                            break;
+                        }
+                        if (noBreaksValue.startsWith(noBreaksPreview)) {
+                            matchedUrl = akkoma.url;
+                            matchedPreview = rawPreview;
+                            matchType = 'noBreaks';
+                            break;
+                        }
+
+                        const maxOffset = 30;
+                        const indexInNorm = normValue.indexOf(normPreview);
+                        if (indexInNorm >= 0 && indexInNorm <= maxOffset) {
+                            matchedUrl = akkoma.url;
+                            matchedPreview = rawPreview;
+                            matchType = 'loose';
+                            break;
+                        }
+                    }
+
+                    if (!matchedUrl) {
+                        const normValueCompletely = normalizeTextCompletely(value);
+                        const maxOffset = 30;
+
+                        for (const akkoma of akkomaData) {
+                            if (!akkoma.preview) continue;
+                            const rawPreview = akkoma.preview;
+                            const normPreviewCompletely = normalizeTextCompletely(rawPreview);
+
+                            const indexInNormCompletely = normValueCompletely.indexOf(normPreviewCompletely);
+                            if (indexInNormCompletely >= 0 && indexInNormCompletely <= maxOffset) {
+                                matchedUrl = akkoma.url;
+                                matchedPreview = rawPreview;
+                                matchType = 'finalNormalized';
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!matchedUrl) {
+                        for (const akkoma of akkomaData) {
+                            if (!akkoma.preview) continue;
+                            const rawPreview = akkoma.preview;
+                            if (rawValue === rawPreview) {
+                                matchedUrl = akkoma.url;
+                                matchedPreview = rawPreview;
+                                matchType = 'exact';
+                                break;
+                            }
+                        }
+                    }
+
+                    if (matchedUrl) {
+                        const container = document.createElement('span');
+                        const link = document.createElement('a');
+                        link.target = "_blank";
+                        link.classList.add('btn2');
+                        link.href = matchedUrl;
+                        link.textContent = "Permalink (match found)";
+
+                        const proof = document.createElement('div');
+                        proof.style.fontSize = '0em';
+                        proof.style.marginTop = '0px';
+
+                        switch (matchType) {
+                            case 'raw':
+                                proof.style.color = 'green';
+                                proof.textContent = `✔ Match found on first try (raw):\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                break;
+                            case 'normalized':
+                                proof.style.color = 'lightgreen';
+                                proof.textContent = `✔ Match found after normalization:\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                break;
+                            case 'noBreaks':
+                                proof.style.color = 'lightblue';
+                                proof.textContent = `✔ Match found after removing line breaks:\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                break;
+                            case 'loose':
+                                proof.style.color = 'orange';
+                                proof.textContent = `✔ Loose match found (near start of post):\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                break;
+                            case 'finalNormalized':
+                                proof.style.color = 'purple';
+                                proof.textContent = `✔ Match found after final normalization:\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                break;
+                            case 'exact':
+                                proof.style.color = 'blue';
+                                proof.textContent = `✔ Exact match found:\nPreview: "${matchedPreview}"\nPost value: "${value.slice(0, matchedPreview.length + 20)}..."`;
+                                break;
+                        }
+
+                        container.appendChild(link);
+                        container.appendChild(proof);
+
+                        const iframeContainer = document.createElement('div');
+                        const iframe = document.createElement('iframe');
+                        iframe.src = `/other/extra/scripts/fakesocialmedia/replyhandler.html?url=${encodeURIComponent(matchedUrl)}`;
+                        iframe.style.border = 'none';
+                        iframe.style.height = '65px';
+                        iframe.style.width = '100%';
+                        iframe.style.overflow = 'auto';
+
+                        const iframeHeightText = document.createElement('div');
+                        iframeHeightText.style.marginTop = '10px';
+                        iframeHeightText.style.fontFamily = 'monospace';
+                        iframeHeightText.style.color = 'gray';
+                        iframeHeightText.textContent = "";
+
+                        iframe.onload = function () {
+                            const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
+                            function measureIframeHeight() {
+                                const bodyHeight = iframeDocument.body.scrollHeight;
+                                iframe.style.height = `${bodyHeight + 33}px`;
+                            }
+                            measureIframeHeight();
+                            setInterval(measureIframeHeight, 3000);
+                        };
+
+                        iframeContainer.appendChild(iframe);
+                        container.appendChild(iframeContainer);
+                        container.appendChild(iframeHeightText);
+
+                        postElement.appendChild(container);
+                    }
+                })
+                .catch(err => {
+                    console.error("Fetch error:", err);
+
+                    const fallback = document.createElement('a');
+                    fallback.classList.add('btn2');
+                    fallback.href = "#";
+                    fallback.textContent = "Fetch error";
+
+                    const reason = document.createElement('div');
+                    reason.style.color = 'red';
+                    reason.style.fontFamily = 'monospace';
+                    reason.style.fontSize = '0.9em';
+                    reason.style.marginTop = '5px';
+                    reason.textContent = `❌ Reason: ${err.message}`;
+
+                    postElement.appendChild(fallback);
+                    postElement.appendChild(reason);
+                });
+        }
+
+        postElement.appendChild(hashtagsElement);
+        const buttonElement = document.createElement('button');
+        buttonElement.classList.add('btn');
+        const buttonText = value.slice(0, 40) || 'btn';
+        buttonElement.textContent = 'Comment';
+        buttonElement.addEventListener('click', () => {
+            window.open(`/other/extra/scripts/fakesocialmedia/comment.php?text=${encodeURIComponent(buttonText)}`, '_blank');
+        });
+        postElement.appendChild(buttonElement);
+        
+        const buttonElement2 = document.createElement('a');
+        buttonElement2.classList.add('btn2');
+        const buttonText2 = value.slice(0, 40) || 'btn';
+        buttonElement2.textContent = '(load comments)';
+        buttonElement2.href = `/other/extra/scripts/fakesocialmedia/commentload.html?number=40&text=${encodeURIComponent(buttonText2)}`;
+        buttonElement2.target = "_blank";
+        postElement.appendChild(buttonElement2);
+
+        if (value.includes('youtube.com') && !value.includes('youtube.com/shorts')) {
+            const videoEmbed = document.createElement('iframe');
+            videoEmbed.src = `https://www.youtube.com/embed/${getVideoId(value)}`;
+            videoEmbed.width = '560';
+            videoEmbed.height = '315';
+            videoEmbed.frameborder = '0';
+            videoEmbed.allowfullscreen = 'true';
+            videoEmbed.setAttribute('allowfullscreen', '');
+            postElement.appendChild(videoEmbed);
+        }
+        
+        return postElement;
+    }
+
+    // Function to load more posts
+    function loadMorePosts() {
+        loadMoreBtn.classList.add('loading');
+        loadMoreBtn.textContent = 'Loading...';
+        
+        // Calculate the next batch of posts to show
+        const nextBatch = allPosts.slice(currentOffset, currentOffset + postsPerLoad);
+        
+        if (nextBatch.length === 0) {
+            loadMoreBtn.textContent = 'No more posts';
+            loadMoreBtn.disabled = true;
+            return;
+        }
+        
+        // Add a small delay for better UX
+        setTimeout(() => {
+            nextBatch.forEach(post => {
+                container.appendChild(createPostElement(post));
+            });
+            
+            currentOffset += postsPerLoad;
+            
+            // Check if there are more posts to load
+            if (currentOffset >= allPosts.length) {
+                loadMoreBtn.textContent = 'No more posts';
+                loadMoreBtn.disabled = true;
+            } else {
+                loadMoreBtn.textContent = 'Load More';
+                loadMoreBtn.disabled = false;
+            }
+            
+            loadMoreBtn.classList.remove('loading');
+        }, 300);
+    }
+
+    const user = getQueryParam('user');
+    if (user) {
+        const jsonFile = `/other/extra/scripts/fakesocialmedia/data${all}_${user}.json?t=${Date.now()}`;
+        console.log(jsonFile); 
+        let myDiv = document.getElementById("jsonloaded");
+        myDiv.textContent = jsonFile;
+        fetch(jsonFile)
+            .then(response => response.text())
+            .then(text => {
+                try {
+                    const jsonData = JSON.parse(text);
+                    allPosts = jsonData; // Store all posts
+                    
+                    // Convert limit to number and handle edge cases
+                    const initialLimit = Math.min(parseInt(limit) || 15, allPosts.length);
+                    
+                    // Show the initial posts based on the limit parameter
+                    const initialPosts = allPosts.slice(0, initialLimit);
+                    initialPosts.forEach(post => {
+                        container.appendChild(createPostElement(post));
+                    });
+                    
+                    currentOffset = initialLimit;
+                    
+                    // Show the load more button if there are more posts
+                    if (allPosts.length > initialLimit) {
+                        loadMoreBtn.style.display = 'block';
+                        loadMoreBtn.addEventListener('click', loadMorePosts);
+                    }
+                } catch (error) {
+                    logError(`JSON Parse Error: ${error.message}`);
+                    logError(`Problematic JSON: ${text}`);
+                }
+            })
+            .catch(error => {
+                logError(`Fetch Error: ${error.message}`);
+            });
+    } else {
+        const element = document.createElement('div');
+        element.textContent = 'No user specified (?user=user)';
+        console.log('No user selected, defaulting to alcea');
+        var currentUrl = window.location.href;
+        var newUrl = currentUrl.split('?')[0] + '?user=alcea';
+        window.location.href = newUrl;
+        document.body.appendChild(element);
+    }
+
+    function getVideoId(url) {
+        const regex = /(?:v=|\/embed\/|\.be\/|\/v\/)([a-zA-Z0-9_-]{11})/;
+        const match = url.match(regex);
+        return match ? match[1] : null;
+    }
+
+    function replaceEmojis(text) {
+        return text.replace(/:(\w+):/g, (match, emoji) => {
+            return `${baseurl}/${emoji}.gif`;
+        });
+    }
+    </script>
+</body>
+</html>
