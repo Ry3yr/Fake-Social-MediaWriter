@@ -4,7 +4,7 @@
         font-family: Arial, sans-serif;
         margin: 0;
         padding: 20px;
-        background-color: #f5f8fa;
+        //background-color: #f5f8fa;
     }
 
     .post {
@@ -138,6 +138,9 @@
         <a href="?user=alcea&limit=3" class="btn2">View 3 Posts</a>
         <a href="?user=alcea&limit=10" class="btn2">View 10 Posts</a>
         <a href="?user=alcea" class="btn">Default (15)</a>
+<hr><br>Changelog:<br>
+2025-08-28 Add dynamic "Load more posts" feature<br>
+<hr>
     </div></details>
     
     <div id="errorLog"></div>
@@ -514,8 +517,8 @@
         if (value.includes('youtube.com') && !value.includes('youtube.com/shorts')) {
             const videoEmbed = document.createElement('iframe');
             videoEmbed.src = `https://www.youtube.com/embed/${getVideoId(value)}`;
-            videoEmbed.width = '560';
-            videoEmbed.height = '315';
+            videoEmbed.width = '400';
+            videoEmbed.height = '255';
             videoEmbed.frameborder = '0';
             videoEmbed.allowfullscreen = 'true';
             videoEmbed.setAttribute('allowfullscreen', '');
@@ -534,7 +537,7 @@
         const nextBatch = allPosts.slice(currentOffset, currentOffset + postsPerLoad);
         
         if (nextBatch.length === 0) {
-            loadMoreBtn.textContent = 'No more posts';
+            loadMoreBtn.innerHTML = 'No more posts <a href="?user=alcea&all=yes&limit=55">(all)</a>';
             loadMoreBtn.disabled = true;
             return;
         }
@@ -549,7 +552,7 @@
             
             // Check if there are more posts to load
             if (currentOffset >= allPosts.length) {
-                loadMoreBtn.textContent = 'No more posts';
+                loadMoreBtn.innerHTML = 'No more posts <a href="?user=alcea&all=yes&limit=55">(all)</a>';
                 loadMoreBtn.disabled = true;
             } else {
                 loadMoreBtn.textContent = 'Load More';
@@ -618,6 +621,97 @@
             return `${baseurl}/${emoji}.gif`;
         });
     }
+
+// Modal functionality for images
+const modal = document.createElement('div');
+modal.id = 'imageModal';
+modal.className = 'modal';
+modal.innerHTML = `
+    <span class="modal-close">&times;</span>
+    <img class="modal-content" id="modalImage">
+    <div id="modalCaption"></div>
+`;
+document.body.appendChild(modal);
+const modalStyles = document.createElement('style');
+modalStyles.textContent = `
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.9);
+    }
+    .modal-content {
+        display: block;
+        margin: auto;
+        max-width: 90%;
+        max-height: 80%;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    .modal-close {
+        position: absolute;
+        top: 15px;
+        right: 35px;
+        color: #f1f1f1;
+        font-size: 40px;
+        font-weight: bold;
+        cursor: pointer;
+        z-index: 1001;
+    }
+    .modal-close:hover,
+    .modal-close:focus {
+        color: #bbb;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    #modalCaption {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: white;
+        text-align: center;
+        width: 80%;
+    }
+    .post img {
+        cursor: pointer;
+        transition: 0.3s;
+    }
+    .post img:hover {
+        opacity: 0.7;
+    }
+`;
+document.head.appendChild(modalStyles);
+document.addEventListener('click', function(e) {
+    if (e.target.tagName === 'IMG' && e.target.closest('.post')) {
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImage');
+        const captionText = document.getElementById('modalCaption');
+        modal.style.display = "block";
+        modalImg.src = e.target.src;
+        captionText.innerHTML = e.target.alt || "Image";
+    }
+    if (e.target.classList.contains('modal-close')) {
+        document.getElementById('imageModal').style.display = "none";
+    }
+});
+document.getElementById('imageModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        this.style.display = "none";
+    }
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === "Escape") {
+        document.getElementById('imageModal').style.display = "none";
+    }
+});
     </script>
 </body>
 </html>
