@@ -163,6 +163,7 @@
     let postsPerLoad = 15;
     const urlParams = new URLSearchParams(window.location.search);
     let limit = urlParams.get("limit") || "15";
+    const searchText = urlParams.get("text") || "";
     const baseurl = "https://alcea-wisteria.de/z_files/emoji";
     const errorLogDiv = document.getElementById('errorLog');
     const loadMoreBtn = document.getElementById('loadMoreBtn');
@@ -203,6 +204,26 @@
         all = "";
     } else {
         all = "_part";
+    }
+
+    // Function to check if post contains search text
+    function postContainsText(post, searchText) {
+        if (!searchText) return true;
+        
+        try {
+            const date = Object.keys(post)[0];
+            const innerObj = post[date];
+            const value = innerObj.value || "";
+            const hashtags = innerObj.hashtags || "";
+            
+            // Check if search text is in post content, hashtags, or date
+            return value.toLowerCase().includes(searchText.toLowerCase()) || 
+                   hashtags.toLowerCase().includes(searchText.toLowerCase()) || 
+                   date.toLowerCase().includes(searchText.toLowerCase());
+        } catch (e) {
+            console.error("Error checking post for search text:", e);
+            return true;
+        }
     }
 
     // Function to create a post element
@@ -545,7 +566,10 @@
         // Add a small delay for better UX
         setTimeout(() => {
             nextBatch.forEach(post => {
-                container.appendChild(createPostElement(post));
+                // Only show posts that contain the search text (if any)
+                if (postContainsText(post, searchText)) {
+                    container.appendChild(createPostElement(post));
+                }
             });
             
             currentOffset += postsPerLoad;
@@ -581,8 +605,14 @@
                     
                     // Show the initial posts based on the limit parameter
                     const initialPosts = allPosts.slice(0, initialLimit);
+                    let visiblePosts = 0;
+                    
                     initialPosts.forEach(post => {
-                        container.appendChild(createPostElement(post));
+                        // Only show posts that contain the search text (if any)
+                        if (postContainsText(post, searchText)) {
+                            container.appendChild(createPostElement(post));
+                            visiblePosts++;
+                        }
                     });
                     
                     currentOffset = initialLimit;
