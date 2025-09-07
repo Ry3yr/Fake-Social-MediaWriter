@@ -325,7 +325,9 @@ const previewLinks = document.querySelectorAll('.preview-link');
 previewLinks.forEach(link => {
   link.addEventListener('click', function() {
     // Get the value of the Alcea entry (instead of previewText)
-    const value = this.closest('.match').querySelector('pre').textContent.trim();
+    //const value = this.closest('.match').querySelector('pre').textContent.trim();
+    const value = this.closest('.match').querySelector('pre').innerHTML.trim();  // Using innerHTML here
+
     
     // Replace newline characters with CRLF
     const formattedText = value.replace(/\n/g, '\r\n');
@@ -334,7 +336,7 @@ previewLinks.forEach(link => {
     const slicedValue = formattedText.slice(0, 40);
     
     // Encode the sliced and formatted value for the URL
-    const commentLoadUrl = `https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?number=4000&text=${encodeURIComponent(slicedValue)}`;
+    const commentLoadUrl = `https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?number=10000&text=${encodeURIComponent(slicedValue)}`;
     
     // Open the comment load URL in a new window
     window.open(commentLoadUrl, '_blank');
