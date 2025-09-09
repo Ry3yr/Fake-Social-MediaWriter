@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<base href="https://" target="_blank" rel="noopener noreferrer">
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Akkoma Post Viewer</title>
+  <style>
+    body {
+      font-family: sans-serif;
+    }
+    .toot {
+      background: white;
+      padding: 1rem;
+      border-radius: 0px;
+      max-width: 600px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-direction: column;
+    }
+    .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .content {
+      flex: 1;
+    }
+    .user {
+      font-weight: bold;
+    }
+    .handle {
+      color: gray;
+      font-size: 0.9em;
+      margin-left: 0.3em;
+    }
+    .post-content {
+      margin: 0.5em 0;
+    }
+    .counts {
+      color: gray;
+      font-size: 0.9em;
+      display: flex;
+      gap: 1em;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .view-post {
+      margin-top: 0em;
+      font-size: 0.9em;
+      color: #0077cc;
+    }
+    .view-post a {
+      text-decoration: none;
+      color: inherit;
+    }
+    .reply {
+      margin-left: 2rem; /* Indent replies */
+    }
+    .parent-stats {
+      font-size: 1rem;
+      color: gray;
+      margin-bottom: 1rem;
+    }
+    .emoji {
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+<div id="results"></div>
+
+<script>
+  async function fetchEmojis(instance) {
+    const url = `https://${instance}/api/v1/custom_emojis`;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch emojis");
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching emojis: ", error);
+      return [];
+    }
+  }
+
+  function replaceEmojis(content, emojis) {
+    emojis.forEach(emoji => {
+      const regex = new RegExp(`:${emoji.shortcode}:`, 'g');
+      const imgTag = `<img src="${emoji.url}" alt=":${emoji.shortcode}:" class="emoji" style="width:20px; height:20px;">`;
+      content = content.replace(regex, imgTag);
+    });
+    return content;
+  }
+
+  function renderPleromaReactions(post) {
+    if (!post.pleroma || !post.pleroma.emoji_reactions) return '';
+    return post.pleroma.emoji_reactions.map(reaction => {
+      const emojiHtml = reaction.url
+        ? `<img src="${reaction.url}" alt="${reaction.name}" class="emoji" style="width:20px; height:20px;">`
+        : reaction.name;
+      return `<span>${emojiHtml} ${reaction.count}</span>`;
+    }).join(' ');
+  }
+
+  async function fetchPostStats(postUrl) {
+    const { instance, statusId } = extractInstanceAndStatus(postUrl);
+    try {
+      const response = await fetch(`https://${instance}/api/v1/statuses/${statusId}`);
+      if (!response.ok) throw new Error("Failed to fetch post");
+      const data = await response.json();
+      const emojis = await fetchEmojis(instance);
+      let content = replaceEmojis(data.content, emojis);
+      const fullPostUrl = data.url;
+      const reactionHtml = renderPleromaReactions(data);
+
+      const postHtml = `
+        <div class="toot">
+          <div class="header">
+            <div class="content">
+              <div class="parent-stats">
+              </div>
+              <div class="counts">
+                ❤️ ${data.favourites_count}
+                🔁 ${data.reblogs_count}
+                💬 ${data.replies_count}
+                ${reactionHtml}
+              </div>
+              <div class="view-post">
+              </div>
+            </div>
+          </div>
+          <div class="replies" id="replies-${statusId}"></div>
+        </div>
+      `;
+      const repliesContainer = document.createElement('div');
+      repliesContainer.innerHTML = postHtml;
+      document.getElementById('results').appendChild(repliesContainer);
+      if (data.replies_count > 0) {
+        const sorted = new URLSearchParams(window.location.search).has('sorted');
+        await fetchReplies(statusId, instance, sorted);
+      }
+    } catch (error) {
+      document.getElementById('results').innerHTML = `<p>Error: ${error.message}</p>`;
+    }
+  }
+
+  async function fetchReplies(statusId, instance, sorted = false) {
+    const url = `https://${instance}/api/v1/statuses/${statusId}/context`;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch replies");
+      const data = await response.json();
+      const replies = data.descendants;
+      const container = document.getElementById(`replies-${statusId}`);
+
+      if (sorted) {
+        const tree = buildReplyTree(replies);
+        renderReplyTree(tree, container, instance);
+      } else {
+        for (const reply of replies) {
+          const replyHtml = await renderPost(reply, instance);
+          container.innerHTML += replyHtml;
+          if (reply.replies_count > 0) {
+            await fetchReplies(reply.id, instance, false);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching replies: ", error);
+    }
+  }
+
+  function buildReplyTree(replies) {
+    const idToNode = {};
+    const roots = [];
+
+    replies.forEach(reply => {
+      idToNode[reply.id] = { post: reply, children: [] };
+    });
+
+    replies.forEach(reply => {
+      if (reply.in_reply_to_id && idToNode[reply.in_reply_to_id]) {
+        idToNode[reply.in_reply_to_id].children.push(idToNode[reply.id]);
+      } else {
+        roots.push(idToNode[reply.id]);
+      }
+    });
+
+    return roots;
+  }
+
+  async function renderReplyTree(tree, container, instance) {
+    for (const node of tree) {
+      const html = document.createElement('div');
+      html.innerHTML = await renderPost(node.post, instance);
+      const postDiv = html.firstElementChild;
+      container.appendChild(postDiv);
+
+      if (node.children.length > 0) {
+        const childContainer = document.createElement('div');
+        childContainer.classList.add('reply');
+        postDiv.appendChild(childContainer);
+        await renderReplyTree(node.children, childContainer, instance);
+      }
+    }
+  }
+
+  async function renderPost(post, instance) {
+    const acct = post.account;
+    const postUrl = post.url;
+    const emojis = await fetchEmojis(instance);
+    let content = replaceEmojis(post.content, emojis);
+    const reactionHtml = renderPleromaReactions(post);
+
+    return `
+      <div class="toot reply">
+        <div class="header">
+          <img src="${acct.avatar_static}" alt="avatar" class="avatar">
+          <div class="content">
+            <div class="user">
+              ${acct.display_name || acct.username}
+              <span class="handle">@${acct.acct}</span>
+            </div>
+            <div class="post-content">${content}</div>
+            <div class="counts">
+              ❤️ ${post.favourites_count}
+              🔁 ${post.reblogs_count}
+              💬 ${post.replies_count}
+              ${reactionHtml}
+            </div>
+            <div class="view-post">
+              <a href="${postUrl}" target="_blank">View This Reply</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function extractInstanceAndStatus(postUrl) {
+    const urlParts = postUrl.split('/');
+    const instance = urlParts[2];
+    const statusId = urlParts[urlParts.length - 1];
+    return { instance, statusId };
+  }
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const postUrl = urlParams.get('url');
+  if (postUrl) {
+    fetchPostStats(postUrl);
+  } else {
+    fetchPostStats('https://mas.to/@alcea/77114904324244946765');
+  }
+</script>
+
+</body>
+</html>
+
+
+<!--
+    <div id="page-height-display"></div>
+    <script>
+        function updatePageHeight() {
+            var resultsDiv = document.getElementById("results");
+            var divHeight = resultsDiv ? resultsDiv.scrollHeight : 0;
+            
+            // Display height on page
+            document.getElementById("page-height-display").textContent = "Height: " + divHeight + "px";
+
+            // Send height to parent window
+            if (window.parent) {
+                window.parent.postMessage({
+                    id: "current url displayed",
+                    height: divHeight
+                }, "*");
+            }
+
+            // If height is 0, wait 1.5 seconds and try again
+            if (divHeight === 0) {
+                setTimeout(updatePageHeight, 1500);
+            }
+        }
+
+        // Trigger function when window is resized
+        window.addEventListener("resize", updatePageHeight);
+
+        // Initial call to update the height when the page loads
+        window.addEventListener("load", updatePageHeight);
+    </script>-->
+
+</body>
+</html>
