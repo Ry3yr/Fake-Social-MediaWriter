@@ -151,6 +151,22 @@
       background-color: #f9f9f9;
       cursor: not-allowed;
     }
+    .manual-handle-container {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #fff3cd;
+      border-radius: 4px;
+      border: 1px solid #ffeaa7;
+      display: none;
+    }
+    .manual-handle-container input {
+      margin-top: 5px;
+    }
+    .instructions {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -185,6 +201,12 @@
     
     <div id="duplicateWarning">This content has already been posted recently!</div>
     <div id="replyNotice" class="reply-notice"></div>
+    
+    <div id="manualHandleContainer" class="manual-handle-container">
+      <label>Could not resolve user handle. Please enter manually:</label>
+      <input type="text" id="manualHandle" placeholder="username@domain.tld" />
+      <div class="instructions">Enter just the handle part (e.g., username@domain.tld) without the @ prefix</div>
+    </div>
     
     <button id="postButton" onclick="postToAkkoma()">Post to Akkoma</button>
   </div>
@@ -356,6 +378,7 @@
     async function checkForReply() {
       const text = document.getElementById("mainText").value;
       const replyNotice = document.getElementById("replyNotice");
+      const manualHandleContainer = document.getElementById("manualHandleContainer");
 
       const replyMatch = text.match(/💬"([^"]+)"#💬/) || text.match(/💬([^#]+)#💬/);
       if (replyMatch) {
@@ -370,16 +393,19 @@
 
         if (replyInfo && replyInfo.fullHandle) {
           replyNotice.innerHTML = `This is a reply to ${replyInfo.fullHandle}`;
+          manualHandleContainer.style.display = 'none';
           logToDom(`Resolved reply to: ${replyInfo.fullHandle} (local id: ${replyInfo.localStatusId || "n/a"})`);
         } else {
           replyNotice.innerHTML = `This is a reply to: ${detectedReplyUrl}`;
-          logToDom(`Detected reply to: ${detectedReplyUrl}`);
+          manualHandleContainer.style.display = 'block';
+          logToDom(`Detected reply to: ${detectedReplyUrl} (could not resolve handle)`);
         }
         return detectedReplyUrl;
       } else {
         detectedReplyUrl = null;
         replyInfo = null;
         replyNotice.innerHTML = "";
+        manualHandleContainer.style.display = 'none';
         return null;
       }
     }
@@ -389,7 +415,7 @@
         const response = await fetch('/other/extra/scripts/fakesocialmedia/0ld/data_akkoma.json?t=' + Date.now());
         const recentPosts = await response.json();
         const currentText = document.getElementById("hiddenText").value.trim();
-        const previewText = currentText.slice(0, 40);
+        const previewText = currentText.slice(0, 54);
 
         logToDom(`Checking against ${recentPosts.length} recent posts...`);
         const latestPosts = recentPosts.slice(0, 5);
@@ -407,7 +433,7 @@
         const warningDiv = document.getElementById("duplicateWarning");
 
         if (duplicateFound) {
-          postButton.disabled = false;
+          postButton.disabled = true;
           warningDiv.style.display = 'block';
           logToDom("Post button disabled due to duplicate content");
         } else {
@@ -500,7 +526,7 @@
       let rawStatus = document.getElementById("mainText").value.trim();
       
       // Get the preview from the HIDDEN TEXTAREA (for JSON)
-      const preview = document.getElementById("hiddenText").value.slice(0, 40);
+      const preview = document.getElementById("hiddenText").value.slice(0, 54);
 
       if (!instance || !token || !rawStatus) {
         logToDom("❌ Missing instance, API key, or content");
@@ -543,9 +569,22 @@
         if (detectedReplyUrl) {
           // Resolve remote URL to a LOCAL status id on *your* instance
           replyInfo = await resolveReplyInfo(instance, token, detectedReplyUrl);
-          if (!replyInfo) {
-            throw new Error("Could not resolve reply target on local instance.");
+          
+          // Check if we have a manual handle input as fallback
+          const manualHandle = document.getElementById("manualHandle").value.trim();
+          if (!replyInfo && manualHandle) {
+            // Use the manually entered handle directly - no URL processing
+            replyInfo = {
+              localStatusId: null,
+              fullHandle: `@${manualHandle}`  // Add @ prefix here
+            };
+            logToDom(`Using manually entered handle: @${manualHandle}`);
           }
+          
+          if (!replyInfo) {
+            throw new Error("Could not resolve reply target on local instance and no manual handle provided.");
+          }
+          
           inReplyToId = replyInfo.localStatusId;
           replyMention = replyInfo.fullHandle || null;
 
@@ -615,6 +654,8 @@
 
         detectedReplyUrl = null;
         replyInfo = null;
+        document.getElementById("manualHandleContainer").style.display = 'none';
+        document.getElementById("manualHandle").value = '';
       } catch (err) {
         logToDom("❌ Error: " + err.message);
       }

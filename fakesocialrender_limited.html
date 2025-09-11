@@ -149,7 +149,7 @@
     <!--Search-->
     <form action="/other/extra/scripts/fakesocialmedia/commentload.html" method="get" target="_blank" style="margin-bottom: 20px; max-width: 600px;">
         <input type="text" id="keyword" name="text" required placeholder="Search posts..." style="padding: 8px; width: 70%; border: 1px solid #ccd6dd; border-radius: 4px;">
-        <input type="hidden" name="number" value="4000">
+        <input type="hidden" name="number" value="8000">
         <button type="submit" style="padding: 8px 16px; background-color: #1da1f2; color: white; border: none; border-radius: 4px; cursor: pointer;">Search</button>
     </form>
     
@@ -468,7 +468,7 @@
 
                         const iframeContainer = document.createElement('div');
                         const iframe = document.createElement('iframe');
-                        iframe.src = `/other/extra/scripts/fakesocialmedia/replyhandler.html?url=${encodeURIComponent(matchedUrl)}`;
+                        iframe.src = `/other/extra/scripts/fakesocialmedia/replyhandler.html?url=${encodeURIComponent(matchedUrl)}&sorted`;
                         iframe.style.border = 'none';
                         iframe.style.height = '65px';
                         iframe.style.width = '100%';
@@ -520,7 +520,7 @@
         postElement.appendChild(hashtagsElement);
         const buttonElement = document.createElement('button');
         buttonElement.classList.add('btn');
-        const buttonText = value.slice(0, 40) || 'btn';
+        const buttonText = value.slice(0, 54) || 'btn';
         buttonElement.textContent = 'Comment';
         buttonElement.addEventListener('click', () => {
             window.open(`/other/extra/scripts/fakesocialmedia/comment.php?text=${encodeURIComponent(buttonText)}`, '_blank');
@@ -529,11 +529,43 @@
         
         const buttonElement2 = document.createElement('a');
         buttonElement2.classList.add('btn2');
-        const buttonText2 = value.slice(0, 40) || 'btn';
+        const buttonText2 = value.slice(0, 54) || 'btn';
         buttonElement2.textContent = '(load comments)';
-        buttonElement2.href = `/other/extra/scripts/fakesocialmedia/commentload.html?number=40&text=${encodeURIComponent(buttonText2)}`;
+        buttonElement2.href = `/other/extra/scripts/fakesocialmedia/commentload.html?number=8000&text=${encodeURIComponent(buttonText2)}`;
         buttonElement2.target = "_blank";
         postElement.appendChild(buttonElement2);
+
+if (value.includes('soundcloud.com') || value.includes('m.soundcloud.com')) {
+    const soundcloudRegex = /https?:\/\/(?:www\.|m\.)?soundcloud\.com\/[^\s'"\)]+/g;
+    const soundcloudMatches = value.match(soundcloudRegex);
+    if (soundcloudMatches && soundcloudMatches.length > 0) {
+        const soundcloudUrl = soundcloudMatches[0];
+        const debugLog = document.createElement('div');
+        debugLog.style.fontSize = '12px';
+        debugLog.style.color = '#666';
+        debugLog.style.marginTop = '5px';
+        //debugLog.textContent = `SoundCloud URL found: ${soundcloudUrl}`;
+        postElement.appendChild(debugLog);
+        const soundcloudEmbed = document.createElement('iframe');
+        soundcloudEmbed.width = '100%';
+        soundcloudEmbed.height = '266';
+        soundcloudEmbed.scrolling = 'no';
+        soundcloudEmbed.frameBorder = 'no';
+        soundcloudEmbed.allow = 'autoplay';
+        soundcloudEmbed.src = `/other/extra/scripts/fakesocialmedia/soundcloudfetch.php?scurl=${soundcloudUrl}`;
+        soundcloudEmbed.style.marginTop = '10px';
+        soundcloudEmbed.style.borderRadius = '8px';
+        postElement.appendChild(soundcloudEmbed);
+        soundcloudEmbed.onerror = function() {
+            const errorMsg = document.createElement('div');
+            errorMsg.style.color = 'red';
+            errorMsg.style.fontSize = '12px';
+            errorMsg.textContent = 'Failed to load SoundCloud embed';
+            postElement.appendChild(errorMsg);
+        };
+    }
+}
+
 
         if (value.includes('youtube.com') && !value.includes('youtube.com/shorts')) {
             const videoEmbed = document.createElement('iframe');
