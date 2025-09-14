@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>Alcea ↔ Akkoma Match Viewer</title>
   <style>
-    /* [styles remain unchanged — truncated for brevity in this explanation] */
     body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; background-color: #f8f9fa; color: #333; }
     h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
     .stats { font-weight: bold; margin: 20px 0; padding: 15px; background: #e8f4f8; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -26,6 +25,7 @@
     .error { color: #c0392b; background: #fadbd8; border-radius: 5px; margin: 20px 0; }
     .refresh-button { background-color: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-left: 10px; font-size: 0.9em; }
     .refresh-button:hover { background-color: #2980b9; }
+    .preview-link { cursor: pointer; color: #2980b9; text-decoration: underline; margin-left: 10px; display: inline-block; font-size: 0.9em; }
   </style>
 </head>
 <body>
@@ -83,15 +83,15 @@
       alceaData.forEach(item => {
         if (typeof item === 'object' && item !== null) {
           Object.values(item).forEach(entry => {
-            if (entry?.value?.includes('#acws')) {
+            if (entry && typeof entry.value === 'string' && entry.value.includes('#acws')) {
               entries.push(entry);
             }
           });
         }
       });
-    } else if (typeof alceaData === 'object') {
+    } else if (typeof alceaData === 'object' && alceaData !== null) {
       Object.values(alceaData).forEach(entry => {
-        if (entry?.value?.includes('#acws')) {
+        if (entry && typeof entry.value === 'string' && entry.value.includes('#acws')) {
           entries.push(entry);
         }
       });
@@ -117,7 +117,7 @@
 
   function updateStats() {
     const stats = document.getElementById('stats');
-    const filteredMatches = filterMatches();
+    const filtered = filterMatches();
     
     stats.innerHTML = `
       <span class="stat-item" id="alcea-stat">
@@ -158,19 +158,40 @@
       return;
     }
 
+    //tlpreview
     matchesDiv.innerHTML = '';
     filtered.forEach(entry => {
       const div = document.createElement('div');
       div.className = 'match';
-
       if (entry.type) {
+        // Build preview link URL using first 40 chars of value (with linebreaks replaced)
+const rawValue = entry.value;
+const sliced = rawValue
+  .slice(0, 40)
+  .replace(/\r\n/g, '\n')
+  .replace(/\r/g, '\n')
+  .replace(/\n/g, '\r\n');
+
+let previewTextParam = '';
+try {
+  previewTextParam = encodeURIComponent(sliced);
+} catch (e) {
+  console.warn('Encoding failed for preview link text:', sliced, e);
+  previewTextParam = '';
+}
+const previewUrl = `https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?text=${previewTextParam}&number=8000`;
+
+
+
         div.innerHTML = `
           <div><strong>Match type:</strong> ${entry.type}
             <span class="match-type ${entry.type}">${entry.type}</span></div>
           <div class="url"><strong>Akkoma URL:</strong> <a href="${entry.url}" target="_blank">${entry.url}</a></div>
           <div class="preview"><strong>Preview:</strong> ${entry.preview}</div>
           <div><strong>Alcea value snippet:</strong>
-            <pre>${entry.value.slice(0, 500)}${entry.value.length > 500 ? '...' : ''}</pre></div>
+            <pre>${entry.value.slice(0, 500)}${entry.value.length > 500 ? '...' : ''}</pre>
+            <a class="preview-link" href="${previewUrl}" target="_blank">View in preview viewer ↗</a>
+          </div>
         `;
       } else {
         div.innerHTML = `
@@ -237,13 +258,13 @@
             matched = true;
             break;
           }
-          if (normValue.indexOf(normPreview) <= 30 && normValue.indexOf(normPreview) !== -1) {
+          if (normValue.indexOf(normPreview) >= 0 && normValue.indexOf(normPreview) <= 30) {
             allData.matches.push({ type: 'loose', preview: rawPreview, url, value });
             matchedAkkomaUrls.add(url);
             matched = true;
             break;
           }
-          if (normValueCompletely.indexOf(normPreviewCompletely) <= 30 && normValueCompletely.indexOf(normPreviewCompletely) !== -1) {
+          if (normValueCompletely.indexOf(normPreviewCompletely) >= 0 && normValueCompletely.indexOf(normPreviewCompletely) <= 30) {
             allData.matches.push({ type: 'finalNormalized', preview: rawPreview, url, value });
             matchedAkkomaUrls.add(url);
             matched = true;
@@ -272,5 +293,6 @@
 
   loadData();
 </script>
+
 </body>
 </html>
