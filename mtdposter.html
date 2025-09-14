@@ -225,6 +225,7 @@
     let detectedReplyUrl = null;
     let currentUser = null;
     let replyInfo = null;
+    let alceaId = null; // Variable to store the alcea ID
     const CORS_PROXY = "https://alceawis.com/cors.php?query=";
 
     function logToDom(message) {
@@ -468,34 +469,42 @@
         logToDom("LocalStorage found — showing Read button");
       }
 
-      try {
-        const url = 'data_part_alcea.json?t=' + Date.now();
-        const res = await fetch(url);
-        const data = await res.json();
+try {
+  // First fetch data_alcea.json to get the total count for ID generation
+  const countResponse = await fetch('data_alcea.json?t=' + Date.now());
+  const countData = await countResponse.json();
+  const totalCount = countData.length;
+  
+  // Then fetch data_part_alcea.json for the actual content
+  const url = 'data_part_alcea.json?t=' + Date.now();
+  const res = await fetch(url);
+  const data = await res.json();
 
-        let latest = null;
-        for (let i = 0; i < data.length; i++) {
-          const entry = data[i];
-          const dateKey = Object.keys(entry)[0];
-          const valueObj = entry[dateKey];
-          if (valueObj && typeof valueObj.value === "string" && valueObj.value.includes("•acws")) {
-            latest = valueObj.value;
-            break;
-          }
-        }
+  let latest = null;
+  for (let i = 0; i < data.length; i++) {
+    const entry = data[i];
+    const dateKey = Object.keys(entry)[0];
+    const valueObj = entry[dateKey];
+    if (valueObj && typeof valueObj.value === "string" && valueObj.value.includes("•acws")) {
+      latest = valueObj.value;
+      // Use totalCount from data_alcea.json for ID generation
+      alceaId = totalCount - i; // Reverse the order
+      break;
+    }
+  }
 
-        if (latest) {
-          document.getElementById("mainText").value = latest;
-          document.getElementById("hiddenText").value = latest;
-          logToDom("Loaded latest •acws entry from JSON");
-          await checkForReply();
-          await checkForDuplicates();
-        } else {
-          logToDom("No •acws entry found in data_part_alcea.json");
-        }
-      } catch (err) {
-        logToDom("Error loading data_part_alcea.json: " + err.message);
-      }
+  if (latest) {
+    document.getElementById("mainText").value = latest;
+    document.getElementById("hiddenText").value = latest;
+    logToDom(`Loaded latest •acws entry (ID: ${alceaId}, based on data_alcea.json count)`);
+    await checkForReply();
+    await checkForDuplicates();
+  } else {
+    logToDom("No •acws entry found in data_part_alcea.json");
+  }
+} catch (err) {
+  logToDom("Error loading JSON files: " + err.message);
+}
 
       document.getElementById("mainText").addEventListener('input', async function() {
         // REMOVED: No longer updating hiddenText when mainText changes
@@ -638,11 +647,12 @@
           replyTo: detectedReplyUrl || null,
           replyLocalId: inReplyToId || null,
           mentionUsed: replyMention || null,
-          visibility: postData.visibility
+          visibility: postData.visibility,
+          alceaId: alceaId // Add the alcea ID to the JSON
         };
 
         document.getElementById("jsonPreview").innerText = JSON.stringify(logObject, null, 2);
-        logToDom(`✅ Posted. URL: ${postUrlResponse || "(no url in response)"} | reply to local id: ${inReplyToId}`);
+        logToDom(`✅ Posted. URL: ${postUrlResponse || "(no url in response)"} | reply to local id: ${inReplyToId} | alceaId: ${alceaId}`);
 
         await fetch("/other/extra/scripts/fakesocialmedia/0ld/save_post.php", {
           method: "POST",
