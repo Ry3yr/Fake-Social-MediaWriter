@@ -1,18 +1,28 @@
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const htmlModeParam = urlParams.get('htmlmode');
-      if (htmlModeParam === null) {
-        setTimeout(() => {
-          const htmlModeCheckbox = document.getElementById('htmlMode');
-          if (htmlModeCheckbox) {
-            htmlModeCheckbox.checked = false;
-            console.log('HTML mode unchecked automatically (htmlmode parameter not found)');
-          }
-        }, 100);
-      }
-    });
-  </script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const htmlModeParam = urlParams.get('htmlmodeno');
+    
+    if (htmlModeParam === null) {
+      setTimeout(() => {
+        const htmlModeCheckbox = document.getElementById('htmlMode');
+        if (htmlModeCheckbox) {
+          htmlModeCheckbox.checked = true; // Check the checkbox when the parameter is not found
+          console.log('HTML mode checked automatically (htmlmode parameter not found)');
+        }
+      }, 100);
+    } else {
+      setTimeout(() => {
+        const htmlModeCheckbox = document.getElementById('htmlMode');
+        if (htmlModeCheckbox) {
+          htmlModeCheckbox.checked = false; // Uncheck the checkbox when the parameter is found
+          console.log('HTML mode unchecked automatically (htmlmode parameter found)');
+        }
+      }, 100);
+    }
+  });
+</script>
+
 
 <!DOCTYPE html>
 <html lang="en">
