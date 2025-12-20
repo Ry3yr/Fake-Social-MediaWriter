@@ -1,0 +1,1207 @@
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const htmlModeParam = urlParams.get('htmlmodeno');
+    if (htmlModeParam === null) {
+      setTimeout(() => {
+        const htmlModeCheckbox = document.getElementById('htmlMode');
+        if (htmlModeCheckbox) {
+          htmlModeCheckbox.checked = true;
+          console.log('HTML mode checked automatically (htmlmode parameter not found)');
+        }
+      }, 100);
+    } else {
+      setTimeout(() => {
+        const htmlModeCheckbox = document.getElementById('htmlMode');
+        if (htmlModeCheckbox) {
+          htmlModeCheckbox.checked = false;
+          console.log('HTML mode unchecked automatically (htmlmode parameter found)');
+        }
+      }, 100);
+    }
+  });
+</script>
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Akkoma Poster with CORS Proxy</title>
+  
+  <details><summary>Troubleshooting</summary>
+*<u>Error in resolving reply</u><br><br>
+If the error "Could not resolve userhandle" <a target="_blank" href="/other/extra/scripts/fakesocialmedia/commentload.html?number=8000&text=How %23peculiar ..#https://infosec.exchange/@alcea/115750711046418401">occurs</a><br>
+You might have to unblock the domain of this poster () in your adblocker or host file<br>
+This can be: <b>*github.io *alceawis.de </b>
+<br><br>
+aswell as 'the instance you are trying to resolve'<br>
+Add exception via (here <a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/commentload.html?text=vivaldi&number=20000">we use Vivaldi as example)</a><br>
+<blockquote>Settings -> Tracker n Adblocker -> Blocklevel per site </blockquote><br>
+Add "new domain" -> block nothing<br>
+<hr style="width:50%;float:left;">
+<br>
+<br>
+</details>
+
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    h2 {
+      color: #2b6dad;
+      border-bottom: 2px solid #2b6dad;
+      padding-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: bold;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .checkbox-group {
+      margin: 15px 0;
+    }
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+    button {
+      background-color: #2b6dad;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 0;
+    }
+    button:hover {
+      background-color: #1a4d80;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    #readBtn { 
+      display: none; 
+      margin-top: 5px; 
+      background-color: #6c757d;
+    }
+    #debugLog {
+      border: 1px solid #ccc;
+      background: #f9f9f9;
+      padding: 10px;
+      margin-top: 15px;
+      font-family: monospace;
+      font-size: 0.9em;
+      max-height: 250px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    #jsonPreview {
+      border: 1px solid #999;
+      background: #f0f0f0;
+      padding: 10px;
+      margin-top: 15px;
+      font-family: monospace;
+      font-size: 0.9em;
+      white-space: pre-wrap;
+    }
+    #duplicateWarning {
+      color: red;
+      font-weight: bold;
+      margin: 10px 0;
+      display: none;
+      padding: 10px;
+      background-color: #ffeeee;
+      border-radius: 4px;
+    }
+    .reply-notice {
+      color: #228B22;
+      font-weight: bold;
+      margin: 5px 0;
+      padding: 8px;
+      background-color: #f0fff0;
+      border-radius: 4px;
+    }
+    .reply-details {
+      margin-left: 20px;
+      font-size: 0.9em;
+      color: #666;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .mode-selector {
+      display: flex;
+      gap: 15px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+    }
+    .mode-selector label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin: 5px 0;
+    }
+    .status {
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .status.success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .status.error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .status.info {
+      background-color: #cce5ff;
+      color: #004085;
+    }
+    .textboxes-container {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 15px;
+    }
+    .textbox-wrapper {
+      flex: 1;
+    }
+    .textbox-wrapper h3 {
+      margin-top: 0;
+      color: #2b6dad;
+    }
+    #hiddenText {
+      opacity: 0.3;
+      background-color: #f9f9f9;
+      cursor: not-allowed;
+    }
+    .manual-handle-container {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #fff3cd;
+      border-radius: 4px;
+      border: 1px solid #ffeaa7;
+      display: none;
+    }
+    .manual-handle-container input {
+      margin-top: 5px;
+    }
+    .instructions {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 5px;
+    }
+    /* File upload styles */
+    .upload-section {
+      margin: 20px 0;
+      padding: 15px;
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      border: 2px dashed #dee2e6;
+    }
+    .file-input-container {
+      margin-bottom: 15px;
+    }
+    .file-preview {
+      margin-top: 15px;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    .file-info {
+      flex: 1;
+      margin-left: 10px;
+    }
+    .file-name {
+      font-weight: bold;
+    }
+    .file-size {
+      color: #666;
+      font-size: 0.9em;
+    }
+    .remove-file {
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    .remove-file:hover {
+      background: #c82333;
+    }
+    .upload-progress {
+      margin-top: 10px;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background: #e9ecef;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 5px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #28a745;
+      transition: width 0.3s;
+    }
+    .upload-options {
+      display: flex;
+      gap: 15px;
+      margin-top: 10px;
+    }
+    .media-type-selector {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Akkoma Poster with CORS Proxy Support</h2>
+
+    <label>Instance URL:</label>
+    <input type="text" id="instance" placeholder="https://your.instance.tld" />
+    
+    <label>API Key:</label>
+    <input type="text" id="apikey" />
+    
+    <div class="mode-selector">
+      <label><input type="checkbox" id="htmlMode" onchange="toggleMode('html')" /> HTML mode</label>
+      <label><input type="checkbox" id="htmlModeHashtag" onchange="toggleMode('html+hashtag')" /> HTML+Hashtag mode</label>
+      <label><input type="checkbox" id="mfmMode" onchange="toggleMode('mfm')" /> MFM mode</label>
+    </div>
+    
+    <button id="readBtn" onclick="readFromStorage()">Read from Storage</button>
+  </div>
+
+  <div class="card">
+    <div class="textboxes-container">
+      <div class="textbox-wrapper">
+        <h3>Post Content (Will be sent):</h3>
+        <textarea id="mainText" rows="10" placeholder="Enter your post content here..."></textarea>
+      </div>
+      <div class="textbox-wrapper">
+        <h3>Hidden Content (For JSON - Unchanged):</h3>
+        <textarea id="hiddenText" rows="10" readonly></textarea>
+      </div>
+    </div>
+    
+    <!-- File Upload Section -->
+    <div class="upload-section">
+      <h3>📁 Media Upload</h3>
+      <div class="file-input-container">
+        <label for="mediaUpload">Select files (Images, MP4, GIF):</label>
+        <input type="file" id="mediaUpload" accept="image/*,video/mp4,video/quicktime,video/webm,image/gif" multiple>
+        <div class="upload-options">
+          <div class="media-type-selector">
+            <label><input type="checkbox" id="addAsGallery" checked> Upload as gallery (multiple images)</label>
+          </div>
+          <div class="media-type-selector">
+            <label><input type="radio" name="videoType" value="video" checked> Upload video as video</label>
+            <label><input type="radio" name="videoType" value="gif"> Convert video to GIF (if supported)</label>
+          </div>
+        </div>
+      </div>
+      
+      <div id="filePreview" class="file-preview">
+        <!-- File previews will appear here -->
+      </div>
+      
+      <div id="uploadProgress" class="upload-progress" style="display: none;">
+        <div>Upload Progress:</div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+        <div id="progressText">0%</div>
+      </div>
+    </div>
+    
+    <div id="duplicateWarning">This content has already been posted recently!</div>
+    <div id="replyNotice" class="reply-notice"></div>
+    
+    <div id="manualHandleContainer" class="manual-handle-container">
+      <label>Could not resolve user handle. Please enter manually:</label>
+      <input type="text" id="manualHandle" placeholder="username@domain.tld" />
+      <div class="instructions">Enter just the handle part (e.g., username@domain.tld) without the @ prefix</div>
+    </div>
+    
+    <button id="postButton" onclick="postToAkkoma()">Post to Akkoma</button>
+  </div>
+
+  <div class="card">
+    <h3>📦 JSON that will be saved:</h3>
+    <div id="jsonPreview" contenteditable="true">{}</div>
+  </div>
+
+  <div class="card">
+    <h3>📦 Past JSON from Local Storage</h3>
+    <button onclick="loadLocalStoragePosts()">Load Local Storage Items</button>
+    <button onclick="clearLocalStoragePosts()" style="background-color: #dc3545; margin-left: 10px;">Clear Storage</button>
+    <div id="localStoragePosts" style="margin-top: 15px; max-height: 300px; overflow-y: auto;">
+      <!-- Past posts will be displayed here -->
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🪵 Debug Log</h3>
+    <div id="debugLog"><strong>Debug Log:</strong><br /></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const htmlModeParam = urlParams.get('htmlmodeno');
+      const htmlModeHashtagParam = urlParams.get('htmlmodehash');
+      
+      // Check for htmlmodehash parameter first
+      if (htmlModeHashtagParam !== null) {
+        setTimeout(() => {
+          const htmlModeHashtagCheckbox = document.getElementById('htmlModeHashtag');
+          if (htmlModeHashtagCheckbox) {
+            htmlModeHashtagCheckbox.checked = true;
+            console.log('HTML+Hashtag mode checked automatically (htmlmodehash parameter found)');
+          }
+        }, 100);
+      } 
+      // Then check for htmlmodeno parameter
+      else if (htmlModeParam === null) {
+        setTimeout(() => {
+          const htmlModeCheckbox = document.getElementById('htmlMode');
+          if (htmlModeCheckbox) {
+            htmlModeCheckbox.checked = true;
+            console.log('HTML mode checked automatically (htmlmode parameter not found)');
+          }
+        }, 100);
+      } else {
+        setTimeout(() => {
+          const htmlModeCheckbox = document.getElementById('htmlMode');
+          if (htmlModeCheckbox) {
+            htmlModeCheckbox.checked = false;
+            console.log('HTML mode unchecked automatically (htmlmode parameter found)');
+          }
+        }, 100);
+      }
+    });
+
+    let detectedReplyUrl = null;
+    let currentUser = null;
+    let replyInfo = null;
+    let alceaId = null;
+    let uploadedMedia = []; // Array to store uploaded media IDs
+    let selectedFiles = []; // Array to store selected files before upload
+    const CORS_PROXY = "https://alceawis.com/cors.php?query=";
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
+
+    function logToDom(message) {
+      const logDiv = document.getElementById("debugLog");
+      const timestamp = new Date().toISOString();
+      logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function readFromStorage() {
+      const apiKey = localStorage.getItem("apikey");
+      const instance = localStorage.getItem("instance");
+      if (apiKey && instance) {
+        document.getElementById("apikey").value = apiKey;
+        document.getElementById("instance").value = instance;
+        logToDom("Read API key and instance from localStorage");
+      } else {
+        logToDom("No data found in localStorage");
+      }
+    }
+
+    function toggleMode(mode) {
+      const htmlMode = document.getElementById("htmlMode");
+      const htmlModeHashtag = document.getElementById("htmlModeHashtag");
+      const mfmMode = document.getElementById("mfmMode");
+      
+      // Uncheck all other modes
+      if (mode === 'html') {
+        htmlMode.checked = true;
+        htmlModeHashtag.checked = false;
+        mfmMode.checked = false;
+      } else if (mode === 'html+hashtag') {
+        htmlMode.checked = false;
+        htmlModeHashtag.checked = true;
+        mfmMode.checked = false;
+      } else if (mode === 'mfm') {
+        htmlMode.checked = false;
+        htmlModeHashtag.checked = false;
+        mfmMode.checked = true;
+      }
+      
+      logToDom(`Mode changed: ${mode} (HTML: ${htmlMode.checked}, HTML+Hashtag: ${htmlModeHashtag.checked}, MFM: ${mfmMode.checked})`);
+    }
+
+    // Function to properly handle hashtags in HTML mode
+    function processHashtags(text) {
+      // Match hashtags that start with # and contain word characters (letters, numbers, underscores)
+      // and some special characters that might be in hashtags
+      return text.replace(/#([\p{L}\p{N}_]+)/gu, (match, tag) => {
+        return `<a href="https://example.com/tag/${tag}" class="hashtag" rel="tag">#${tag}</a>`;
+      });
+    }
+
+    // Function to process HTML content with hashtag support
+    function processHtmlWithHashtags(text) {
+      // First convert newlines to <br>
+      let processed = text.replace(/\n/g, "<br>");
+      // Then process hashtags
+      processed = processHashtags(processed);
+      return processed;
+    }
+
+    // File handling functions
+    function setupFileUpload() {
+      const fileInput = document.getElementById('mediaUpload');
+      const previewDiv = document.getElementById('filePreview');
+      
+      fileInput.addEventListener('change', function(e) {
+        selectedFiles = Array.from(e.target.files);
+        previewDiv.innerHTML = '';
+        uploadedMedia = [];
+        
+        if (selectedFiles.length === 0) {
+          logToDom("No files selected");
+          return;
+        }
+        
+        logToDom(`Selected ${selectedFiles.length} file(s)`);
+        
+        // Check file sizes and types
+        const validFiles = [];
+        for (const file of selectedFiles) {
+          if (file.size > MAX_FILE_SIZE) {
+            logToDom(`⚠️ File ${file.name} exceeds 50MB limit (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+            continue;
+          }
+          
+          if (!file.type.match(/(image|video)\/(jpeg|png|gif|mp4|quicktime|webm)/)) {
+            logToDom(`⚠️ File ${file.name} has unsupported type: ${file.type}`);
+            continue;
+          }
+          
+          validFiles.push(file);
+          
+          // Create preview item
+          const fileItem = document.createElement('div');
+          fileItem.className = 'file-item';
+          fileItem.innerHTML = `
+            <div class="file-info">
+              <div class="file-name">${file.name}</div>
+              <div class="file-size">${(file.size / 1024).toFixed(2)} KB • ${file.type}</div>
+            </div>
+            <button class="remove-file" onclick="removeSelectedFile('${file.name}')">Remove</button>
+          `;
+          previewDiv.appendChild(fileItem);
+        }
+        
+        selectedFiles = validFiles;
+        logToDom(`Valid files: ${selectedFiles.length}`);
+      });
+    }
+    
+    function removeSelectedFile(fileName) {
+      selectedFiles = selectedFiles.filter(f => f.name !== fileName);
+      const previewDiv = document.getElementById('filePreview');
+      previewDiv.innerHTML = '';
+      
+      // Recreate previews
+      selectedFiles.forEach(file => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+          <div class="file-info">
+            <div class="file-name">${file.name}</div>
+            <div class="file-size">${(file.size / 1024).toFixed(2)} KB • ${file.type}</div>
+          </div>
+          <button class="remove-file" onclick="removeSelectedFile('${file.name}')">Remove</button>
+        `;
+        previewDiv.appendChild(fileItem);
+      });
+      
+      logToDom(`File ${fileName} removed. ${selectedFiles.length} file(s) remaining`);
+    }
+    
+    async function uploadMedia(instance, token) {
+      if (selectedFiles.length === 0) {
+        logToDom("No files to upload");
+        return [];
+      }
+      
+      const progressDiv = document.getElementById('uploadProgress');
+      const progressFill = document.getElementById('progressFill');
+      const progressText = document.getElementById('progressText');
+      
+      progressDiv.style.display = 'block';
+      progressFill.style.width = '0%';
+      progressText.textContent = '0%';
+      
+      const mediaIds = [];
+      const addAsGallery = document.getElementById('addAsGallery').checked;
+      const videoType = document.querySelector('input[name="videoType"]:checked').value;
+      
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Add description if available
+        const description = `Uploaded ${file.name}`;
+        formData.append('description', description);
+        
+        // Add focus for images (optional)
+        if (file.type.startsWith('image/')) {
+          formData.append('focus', '0,0');
+        }
+        
+        logToDom(`Uploading ${file.name} (${file.type}, ${(file.size / 1024).toFixed(2)} KB)...`);
+        
+        try {
+          const uploadUrl = `${instance}/api/v1/media`;
+          const response = await fetchWithProxyFallback(uploadUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+            body: formData,
+          });
+          
+          // Update progress
+          const progress = ((i + 1) / selectedFiles.length) * 100;
+          progressFill.style.width = `${progress}%`;
+          progressText.textContent = `${Math.round(progress)}%`;
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Upload failed (${response.status}): ${errorText}`);
+          }
+          
+          const mediaData = await response.json();
+          
+          // Handle video processing
+          if (file.type.startsWith('video/') && videoType === 'gif') {
+            logToDom(`Converting video to GIF: ${mediaData.id}`);
+            // Some instances support gif conversion via PATCH
+            try {
+              const patchUrl = `${instance}/api/v1/media/${mediaData.id}`;
+              const patchResponse = await fetchWithProxyFallback(patchUrl, {
+                method: 'PATCH',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  'filter': { 'gif': true }
+                }),
+              });
+              
+              if (patchResponse.ok) {
+                logToDom(`Video conversion to GIF requested for ${mediaData.id}`);
+              }
+            } catch (convertError) {
+              logToDom(`Note: GIF conversion might not be supported: ${convertError.message}`);
+            }
+          }
+          
+          mediaIds.push(mediaData.id);
+          logToDom(`✓ Uploaded ${file.name} as media ID: ${mediaData.id}`);
+          
+        } catch (error) {
+          logToDom(`✗ Failed to upload ${file.name}: ${error.message}`);
+          progressDiv.innerHTML += `<div class="status error">Failed to upload ${file.name}</div>`;
+        }
+      }
+      
+      // Hide progress after completion
+      setTimeout(() => {
+        progressDiv.style.display = 'none';
+      }, 2000);
+      
+      return mediaIds;
+    }
+
+    async function fetchWithProxyFallback(url, options) {
+      try {
+        const response = await fetch(url, options);
+        if (response.ok) return response;
+        
+        // If direct request failed, try with CORS proxy
+        logToDom(`Direct request failed (${response.status}), trying with CORS proxy...`);
+        const proxyUrl = CORS_PROXY + encodeURIComponent(url);
+        
+        // For FormData, we need to handle it differently
+        if (options.body instanceof FormData) {
+          const formData = options.body;
+          const newFormData = new FormData();
+          
+          // Rebuild FormData for proxy
+          for (const [key, value] of formData.entries()) {
+            newFormData.append(key, value);
+          }
+          
+          return await fetch(proxyUrl, {
+            method: options.method,
+            headers: {
+              ...options.headers,
+              'Authorization': options.headers?.Authorization || ''
+            },
+            body: newFormData
+          });
+        }
+        
+        return await fetch(proxyUrl, options);
+      } catch (error) {
+        logToDom(`Request failed: ${error.message}, trying with CORS proxy...`);
+        const proxyUrl = CORS_PROXY + encodeURIComponent(url);
+        return await fetch(proxyUrl, options);
+      }
+    }
+
+    async function fetchUserInfo(instance, token) {
+      try {
+        const url = `${instance}/api/v1/accounts/verify_credentials`;
+        const response = await fetchWithProxyFallback(url, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        return await response.json();
+      } catch (error) {
+        logToDom("Error fetching user info: " + error.message);
+        return null;
+      }
+    }
+
+    async function resolveReplyInfo(instance, token, replyUrl) {
+      try {
+        // First try /api/v2/search (preferred)
+        const searchUrl = `${instance}/api/v2/search?resolve=true&type=statuses&q=${encodeURIComponent(replyUrl)}`;
+        const v2 = await fetchWithProxyFallback(searchUrl, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (v2.ok) {
+          const data = await v2.json();
+          if (data.statuses && data.statuses.length > 0) {
+            const s = data.statuses[0];
+            const acct = s.account.acct;
+            const hostFromAcct = acct.includes("@") ? acct.split("@")[1] : (new URL(s.account.url)).hostname;
+            const fullHandle = acct.includes("@") ? acct : `${acct}@${hostFromAcct}`;
+            return {
+              localStatusId: s.id,
+              visibility: s.visibility || "public",
+              authorUrl: s.account.url,
+              fullHandle: `@${fullHandle}`,
+              authorAcct: fullHandle,
+              originalUrl: s.url || replyUrl,
+              context: s.uri || null,
+              conversation: s.uri || null
+            };
+          }
+        } else {
+          logToDom(`Search API failed: HTTP ${v2.status}`);
+        }
+
+        // If search failed, try to extract status ID and fetch directly
+        const statusIdMatch = replyUrl.match(/\/([^\/]+)$/);
+        if (statusIdMatch) {
+          const statusId = statusIdMatch[1];
+          logToDom(`Trying to fetch status directly using ID: ${statusId}`);
+          
+          const statusUrl = `${instance}/api/v1/statuses/${statusId}`;
+          const statusResponse = await fetchWithProxyFallback(statusUrl, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          if (statusResponse.ok) {
+            const s = await statusResponse.json();
+            const acct = s.account.acct;
+            const hostFromAcct = acct.includes("@") ? acct.split("@")[1] : (new URL(s.account.url)).hostname;
+            const fullHandle = acct.includes("@") ? acct : `${acct}@${hostFromAcct}`;
+            
+            return {
+              localStatusId: s.id,
+              visibility: s.visibility || "public",
+              authorUrl: s.account.url,
+              fullHandle: `@${fullHandle}`,
+              authorAcct: fullHandle,
+              originalUrl: s.url || replyUrl,
+              context: s.uri || null,
+              conversation: s.uri || null
+            };
+          } else {
+            logToDom(`Direct status fetch also failed: HTTP ${statusResponse.status}`);
+          }
+        }
+
+        // As last resort, parse handle from URL for UI only
+        const handleMatch = replyUrl.match(/https?:\/\/([^\/]+)\/@([^\/]+)/);
+        if (handleMatch) {
+          const domain = handleMatch[1];
+          const username = handleMatch[2];
+          return {
+            localStatusId: null,
+            visibility: "public",
+            authorUrl: `https://${domain}/users/${username}`,
+            fullHandle: `@${username}@${domain}`,
+            authorAcct: `${username}@${domain}`,
+            originalUrl: replyUrl,
+            context: null,
+            conversation: null
+          };
+        }
+
+        return null;
+      } catch (error) {
+        logToDom("Error resolving reply info: " + error.message);
+        return null;
+      }
+    }
+
+    async function checkForReply() {
+      const text = document.getElementById("mainText").value;
+      const replyNotice = document.getElementById("replyNotice");
+      const manualHandleContainer = document.getElementById("manualHandleContainer");
+
+      const replyMatch = text.match(/💬"([^"]+)"#💬/) || text.match(/💬([^#]+)#💬/);
+      if (replyMatch) {
+        detectedReplyUrl = replyMatch[1];
+        const instance = document.getElementById("instance").value.trim();
+        const token = document.getElementById("apikey").value.trim();
+
+        // Try to resolve immediately if we have creds; otherwise just show the URL
+        replyInfo = (instance && token)
+          ? await resolveReplyInfo(instance, token, detectedReplyUrl)
+          : null;
+
+        if (replyInfo && replyInfo.fullHandle) {
+          replyNotice.innerHTML = `This is a reply to ${replyInfo.fullHandle}`;
+          manualHandleContainer.style.display = 'none';
+          logToDom(`Resolved reply to: ${replyInfo.fullHandle} (local id: ${replyInfo.localStatusId || "n/a"})`);
+        } else {
+          replyNotice.innerHTML = `This is a reply to: ${detectedReplyUrl}`;
+          manualHandleContainer.style.display = 'block';
+          logToDom(`Detected reply to: ${detectedReplyUrl} (could not resolve handle)`);
+        }
+        return detectedReplyUrl;
+      } else {
+        detectedReplyUrl = null;
+        replyInfo = null;
+        replyNotice.innerHTML = "";
+        manualHandleContainer.style.display = 'none';
+        return null;
+      }
+    }
+
+    async function checkForDuplicates() {
+      try {
+        const response = await fetch('/other/extra/scripts/fakesocialmedia/0ld/data_akkoma.json?t=' + Date.now());
+        const recentPosts = await response.json();
+        const currentText = document.getElementById("hiddenText").value.trim();
+        const previewText = currentText.slice(0, 60);
+
+        logToDom(`Checking against ${recentPosts.length} recent posts...`);
+        const latestPosts = recentPosts.slice(0, 5);
+        let duplicateFound = false;
+
+        for (const post of latestPosts) {
+          if (currentText.includes(post.preview) || post.preview.includes(previewText)) {
+            duplicateFound = true;
+            logToDom(`⚠️ Duplicate found: ${post.preview} (posted at ${post.date})`);
+            break;
+          }
+        }
+
+        const postButton = document.getElementById("postButton");
+        const warningDiv = document.getElementById("duplicateWarning");
+
+        if (duplicateFound) {
+          postButton.disabled = true;
+          warningDiv.style.display = 'block';
+          logToDom("Post button disabled due to duplicate content");
+        } else {
+          postButton.disabled = false;
+          warningDiv.style.display = 'none';
+          logToDom("No duplicates found - posting enabled");
+        }
+      } catch (error) {
+        logToDom("Error checking for duplicates: " + error.message);
+      }
+    }
+
+    window.onload = async () => {
+      logToDom("Page loaded");
+      
+      // Setup file upload
+      setupFileUpload();
+      
+      const params = new URLSearchParams(window.location.search);
+      const apiKey = params.get("apikey");
+      const instance = params.get("instance");
+
+      if (apiKey) {
+        document.getElementById("apikey").value = apiKey;
+        localStorage.setItem("apikey", apiKey);
+        logToDom("API key from URL stored in localStorage");
+      }
+      if (instance) {
+        document.getElementById("instance").value = instance;
+        localStorage.setItem("instance", instance);
+        logToDom("Instance from URL stored in localStorage");
+      }
+
+      if (localStorage.getItem("apikey") && localStorage.getItem("instance")) {
+        document.getElementById("readBtn").style.display = "inline-block";
+        logToDom("LocalStorage found — showing Read button");
+      }
+
+      try {
+        // First fetch data_alcea.json to get the total count for ID generation
+        const countResponse = await fetch('data_alcea.json?t=' + Date.now());
+        const countData = await countResponse.json();
+        const totalCount = countData.length;
+        
+        // Then fetch data_part_alcea.json for the actual content
+        const url = 'data_part_alcea.json?t=' + Date.now();
+        const res = await fetch(url);
+        const data = await res.json();
+
+        let latest = null;
+        for (let i = 0; i < data.length; i++) {
+          const entry = data[i];
+          const dateKey = Object.keys(entry)[0];
+          const valueObj = entry[dateKey];
+          if (valueObj && typeof valueObj.value === "string" && valueObj.value.includes("•acws")) {
+            latest = valueObj.value;
+            // Use totalCount from data_alcea.json for ID generation
+            alceaId = totalCount - i; // Reverse the order
+            break;
+          }
+        }
+
+        if (latest) {
+          document.getElementById("mainText").value = latest;
+          document.getElementById("hiddenText").value = latest;
+          logToDom(`Loaded latest •acws entry (ID: ${alceaId}, based on data_alcea.json count)`);
+          await checkForReply();
+          await checkForDuplicates();
+        } else {
+          logToDom("No •acws entry found in data_part_alcea.json");
+        }
+      } catch (err) {
+        logToDom("Error loading JSON files: " + err.message);
+      }
+
+      document.getElementById("mainText").addEventListener('input', async function() {
+        await checkForReply();
+        checkForDuplicates();
+      });
+    };
+
+    function ensureLeadingMention(text, mention) {
+      const trimmed = text.trimStart();
+      if (new RegExp(`^${mention.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(trimmed)) {
+        return text; // already present at start
+      }
+      if (trimmed.startsWith("@")) {
+        // Already starts with some mention; leave as-is
+        return text;
+      }
+      return `${mention} ${text}`;
+    }
+
+    async function postToAkkoma() {
+      const htmlMode = document.getElementById("htmlMode").checked;
+      const htmlModeHashtag = document.getElementById("htmlModeHashtag").checked;
+      const mfmMode = document.getElementById("mfmMode").checked;
+      const instance = document.getElementById("instance").value.trim();
+      const token = document.getElementById("apikey").value.trim();
+      
+      // Get the text from the TEXTAREA (what will be sent)
+      let rawStatus = document.getElementById("mainText").value.trim();
+      
+      // Get the preview from the HIDDEN TEXTAREA (for JSON)
+      const preview = document.getElementById("hiddenText").value.slice(0, 60);
+
+      if (!instance || !token || !rawStatus) {
+        logToDom("❌ Missing instance, API key, or content");
+        return;
+      }
+
+      logToDom("Starting Akkoma post process...");
+
+      try {
+        let contentType;
+        let modeName;
+        
+        if (mfmMode) {
+          contentType = "text/x.misskeymarkdown";
+          modeName = "mfm";
+        } else if (htmlModeHashtag) {
+          contentType = "text/html";
+          modeName = "html+hashtag";
+        } else if (htmlMode) {
+          contentType = "text/html";
+          modeName = "html";
+        } else {
+          contentType = "text/plain";
+          modeName = "plain";
+        }
+
+        currentUser = await fetchUserInfo(instance, token);
+        if (!currentUser) throw new Error("Failed to fetch user information");
+
+        await checkForReply();
+
+        // Upload media first if any files are selected
+        if (selectedFiles.length > 0) {
+          logToDom(`Uploading ${selectedFiles.length} media file(s)...`);
+          uploadedMedia = await uploadMedia(instance, token);
+          
+          if (uploadedMedia.length === 0) {
+            logToDom("⚠️ No media files were successfully uploaded");
+          } else {
+            logToDom(`✓ Successfully uploaded ${uploadedMedia.length} media file(s): ${uploadedMedia.join(', ')}`);
+          }
+        }
+
+        // Strip the inline reply marker from the content body
+        const cleanedStatus = rawStatus.replace(/💬"([^"]+)"#💬|💬([^#]+)#💬/g, '').trim();
+
+        // Render mode transforms
+        let status;
+        if (htmlModeHashtag) {
+          // Use the new HTML+Hashtag processing
+          status = processHtmlWithHashtags(cleanedStatus);
+        } else if (htmlMode) {
+          status = cleanedStatus.replace(/\n/g, "<br>");
+        } else {
+          status = cleanedStatus;
+        }
+
+        // Handle quotes for both modes
+        if (mfmMode) {
+          status = status.replace(/𒐫(.*?)𒐫/gs, "> $1");
+        } else {
+          status = status.replace(/𒐫(.*?)𒐫/gs, "<blockquote>$1</blockquote>");
+        }
+
+        let inReplyToId = null;
+        let replyMention = null;
+
+        if (detectedReplyUrl) {
+          // Resolve remote URL to a LOCAL status id on *your* instance
+          replyInfo = await resolveReplyInfo(instance, token, detectedReplyUrl);
+          
+          // Check if we have a manual handle input as fallback
+          const manualHandle = document.getElementById("manualHandle").value.trim();
+          if (!replyInfo && manualHandle) {
+            // Use the manually entered handle directly - no URL processing
+            replyInfo = {
+              localStatusId: null,
+              fullHandle: `@${manualHandle}`  // Add @ prefix here
+            };
+            logToDom(`Using manually entered handle: @${manualHandle}`);
+          }
+          
+          if (!replyInfo) {
+            throw new Error("Could not resolve reply target on local instance and no manual handle provided.");
+          }
+          
+          inReplyToId = replyInfo.localStatusId;
+          replyMention = replyInfo.fullHandle || null;
+
+          // Ensure the author mention is present at the start
+          if (replyMention) {
+            status = ensureLeadingMention(status, replyMention);
+          }
+        }
+
+        // Build Mastodon/Akkoma-compatible payload
+        const postData = {
+          status,
+          visibility: replyInfo ? (replyInfo.visibility || "public") : "public",
+          in_reply_to_id: inReplyToId
+        };
+
+        // Add media_ids if we have uploaded media
+        if (uploadedMedia.length > 0) {
+          postData.media_ids = uploadedMedia;
+          logToDom(`Adding media IDs to post: ${uploadedMedia.join(', ')}`);
+        }
+
+        // Pleroma/Akkoma extension for rich content types (kept if your instance supports it)
+        if (contentType) {
+          postData.content_type = contentType;
+        }
+
+        const postUrl = `${instance}/api/v1/statuses`;
+        const postRes = await fetchWithProxyFallback(postUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(postData),
+        });
+
+        if (!postRes.ok) {
+          let errBody = "";
+          try { errBody = await postRes.text(); } catch {}
+          throw new Error(`Posting failed (${postRes.status}): ${errBody}`);
+        }
+
+        const postDataResponse = await postRes.json();
+
+        // If server returned a Mastodon Status, it will have id/url/content etc.
+        const postUrlResponse = postDataResponse.url || postDataResponse.uri || "";
+        const now = new Date().toISOString();
+
+        const logObject = {
+          date: now,
+          url: postUrlResponse,
+          preview: preview,
+          mode: modeName,
+          mediaType: contentType,
+          isReply: !!detectedReplyUrl,
+          replyTo: detectedReplyUrl || null,
+          replyLocalId: inReplyToId || null,
+          mentionUsed: replyMention || null,
+          visibility: postData.visibility,
+          alceaId: alceaId,
+          mediaCount: uploadedMedia.length,
+          mediaIds: uploadedMedia
+        };
+
+        document.getElementById("jsonPreview").innerText = JSON.stringify(logObject, null, 2);
+        logToDom(`✅ Posted. URL: ${postUrlResponse || "(no url in response)"} | Media: ${uploadedMedia.length} file(s) | Mode: ${modeName} | alceaId: ${alceaId}`);
+
+        await fetch("/other/extra/scripts/fakesocialmedia/0ld/save_post.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(logObject),
+        });
+        logToDom("📁 JSON sent to save_post.php");
+
+        // Save the JSON to localStorage (append if exists, create if not)
+        try {
+          const existingPosts = JSON.parse(localStorage.getItem('akkomaPosts') || '[]');
+          existingPosts.push(logObject);
+          localStorage.setItem('akkomaPosts', JSON.stringify(existingPosts));
+          logToDom("💾 JSON appended to localStorage (total: " + existingPosts.length + " posts)");
+        } catch (storageError) {
+          logToDom("⚠️ Could not save to localStorage: " + storageError.message);
+        }
+        
+        // Auto-load the updated local storage after posting
+        setTimeout(loadLocalStoragePosts, 500);
+
+        // Reset file state
+        selectedFiles = [];
+        uploadedMedia = [];
+        document.getElementById('mediaUpload').value = '';
+        document.getElementById('filePreview').innerHTML = '';
+        
+        detectedReplyUrl = null;
+        replyInfo = null;
+        document.getElementById("manualHandleContainer").style.display = 'none';
+        document.getElementById("manualHandle").value = '';
+      } catch (err) {
+        logToDom("❌ Error: " + err.message);
+      }
+    }
+
+    function loadLocalStoragePosts() {
+      try {
+        const posts = JSON.parse(localStorage.getItem('akkomaPosts') || '[]');
+        const container = document.getElementById('localStoragePosts');
+        
+        if (posts.length === 0) {
+          container.innerHTML = '<div class="status info">No posts found in local storage</div>';
+          logToDom("No posts found in local storage");
+          return;
+        }
+        
+        let html = `<p>Found ${posts.length} posts in local storage:</p>`;
+        
+        posts.forEach((post, index) => {
+          const mediaInfo = post.mediaCount > 0 ? `📷 ${post.mediaCount} media file(s)` : 'No media';
+          html += `
+            <div class="storage-item" style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; background: white;">
+              <strong>#${index + 1}:</strong> ${post.date}<br>
+              <strong>Preview:</strong> ${post.preview}<br>
+              <strong>URL:</strong> ${post.url || 'N/A'}<br>
+              <strong>Mode:</strong> ${post.mode || 'N/A'}<br>
+              <strong>Media:</strong> ${mediaInfo}<br>
+              <button onclick="viewPostDetails(${index})" style="margin-top: 5px; padding: 3px 8px; font-size: 0.8em;">View Details</button>
+              <div id="postDetails-${index}" style="display: none; margin-top: 10px; padding: 10px; background: #f9f9f9;">
+                <pre>${JSON.stringify(post, null, 2)}</pre>
+              </div>
+            </div>
+          `;
+        });
+        
+        container.innerHTML = html;
+        logToDom(`Loaded ${posts.length} posts from local storage`);
+      } catch (error) {
+        logToDom("Error loading local storage posts: " + error.message);
+      }
+    }
+
+    function viewPostDetails(index) {
+      const detailsElement = document.getElementById(`postDetails-${index}`);
+      if (detailsElement.style.display === 'none') {
+        detailsElement.style.display = 'block';
+      } else {
+        detailsElement.style.display = 'none';
+      }
+    }
+
+    function clearLocalStoragePosts() {
+      if (confirm("Are you sure you want to clear all posts from local storage?")) {
+        localStorage.removeItem('akkomaPosts');
+        document.getElementById('localStoragePosts').innerHTML = 
+          '<div class="status info">Local storage cleared</div>';
+        logToDom("Local storage cleared");
+      }
+    }
+
+  </script>
+</body>
+</html>
