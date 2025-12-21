@@ -1201,7 +1201,137 @@ Add "new domain" -> block nothing<br>
         logToDom("Local storage cleared");
       }
     }
-
   </script>
+  
+<!--fixGlitchForkLinks-->
+<script>
+(function() {
+  let checkInterval;
+  let lastText = '';
+  let isProcessing = false;
+  function checkForText() {
+    if (isProcessing) return;
+    const textField = document.getElementById('mainText');
+    const htmlModeHashtagCheckbox = document.getElementById('htmlModeHashtag');
+    if (!textField || !htmlModeHashtagCheckbox) return;
+    const currentText = textField.value;
+    if (currentText !== lastText && currentText.trim() && htmlModeHashtagCheckbox.checked) {
+      processLinks();
+      lastText = textField.value; // Use the processed value
+    }
+  }
+  function processLinks() {
+    isProcessing = true;
+    const textField = document.getElementById('mainText');
+    const htmlModeHashtagCheckbox = document.getElementById('htmlModeHashtag');
+    if (!textField || !htmlModeHashtagCheckbox || !htmlModeHashtagCheckbox.checked) {
+      isProcessing = false;
+      return;
+    }
+    const text = textField.value;
+    if (!text.trim()) {
+      isProcessing = false;
+      return;
+    }
+    const urlRegex = /(https?:\/\/[^\s<>"'()]+[^\s<>"'().,;:])/gi;
+    const isAlreadyLinked = (url) => {
+      const patterns = [
+        `<a href="${url}"`,
+        `<a href='${url}'`,
+        `href="${url}"`,
+        `href='${url}'`,
+        `>${url}</a>`
+      ];
+      return patterns.some(pattern => text.includes(pattern));
+    };
+    const hasEmojiInFront = (url, fullText, position) => {
+      if (position > 0) {
+        const beforeUrl = fullText.substring(0, position);
+        const emojiRegex = /💬\s*$/;
+        if (emojiRegex.test(beforeUrl.trimEnd())) {
+          return true;
+        }
+        if (beforeUrl.endsWith("💬" + url) || 
+            beforeUrl.includes("💬" + url + "'")) {
+          return true;
+        }
+      }
+      return false;
+    };
+    let match;
+    const urlMatches = [];
+    let newText = text;
+    while ((match = urlRegex.exec(text)) !== null) {
+      urlMatches.push({
+        url: match[0],
+        index: match.index,
+        originalMatch: match[0]
+      });
+    }
+    for (let i = urlMatches.length - 1; i >= 0; i--) {
+      const { url, index, originalMatch } = urlMatches[i];
+      if (isAlreadyLinked(url)) continue;
+      if (hasEmojiInFront(url, text, index)) continue;
+      let displayUrl = url;
+      let trailingPunctuation = '';
+      const lastChar = url.slice(-1);
+      if (/[.,;:]$/.test(lastChar)) {
+        displayUrl = url.slice(0, -1);
+        trailingPunctuation = lastChar;
+      }
+      const link = `<a href="${displayUrl}" target="_blank" rel="noopener noreferrer">${displayUrl}</a>${trailingPunctuation}`;
+      newText = newText.substring(0, index) + 
+                link + 
+                newText.substring(index + originalMatch.length);
+    }
+    if (newText !== text) {
+      textField.value = newText;
+      console.log('Converted URLs to links');
+    }
+    isProcessing = false;
+  }
+  function init() {
+    if (checkInterval) {
+      clearInterval(checkInterval);
+    }
+    const textField = document.getElementById('mainText');
+    const htmlModeHashtagCheckbox = document.getElementById('htmlModeHashtag');
+    if (textField) {
+      textField.addEventListener('input', function() {
+        if (!isProcessing && htmlModeHashtagCheckbox && htmlModeHashtagCheckbox.checked) {
+          setTimeout(processLinks, 300);
+        }
+      });
+      textField.addEventListener('paste', function() {
+        if (!isProcessing && htmlModeHashtagCheckbox && htmlModeHashtagCheckbox.checked) {
+          setTimeout(processLinks, 100);
+        }
+      });
+    }
+    checkInterval = setInterval(checkForText, 2000);
+    if (htmlModeHashtagCheckbox) {
+      htmlModeHashtagCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+          setTimeout(processLinks, 100);
+        }
+      });
+      if (htmlModeHashtagCheckbox.checked) {
+        setTimeout(processLinks, 100);
+      }
+    }
+  }
+  function cleanup() {
+    if (checkInterval) {
+      clearInterval(checkInterval);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  window.addEventListener('beforeunload', cleanup);
+})();
+</script>
 </body>
 </html>
