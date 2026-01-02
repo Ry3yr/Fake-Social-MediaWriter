@@ -1,4 +1,10 @@
-<iframe src="/other/extra/scripts/fakesocialmedia/lastshorthands.html" id="iframe" width="600" height="100"></iframe> <br><hr>
+
+<details><summary style="color: transparent; text-decoration: none;">title</summary> <a href="post_barebones.php" onclick="this.href='post_barebones.php' + window.location.search">Go to post_barebones.php</a>
+</details>
+
+
+<iframe src="/other/extra/scripts/fakesocialmedia/lastshorthands.html" id="iframe" width="100%" height="150"></iframe> <br><hr>
+    <script src="/other/extra/scripts/libraries/crypto-js.min.js"></script>
 <script>
     window.addEventListener('message', (event) => {
         if (event.origin !== window.location.origin) {
@@ -26,10 +32,19 @@
             textbox.selectionStart = textbox.selectionEnd = cursorPos + 1;
         }
     </script>
-    <button onclick="pasteCharacter()">QUOTE</button><br>
+[<a target="_blank" href="https://alcea-wisteria.de/PHP/0demo/2023-08-15-JSFiddle-Clone/htmls/2025-07-26-Escape-code-snippet.html#https://codepen.io/ryedai1/pen/LEpRyGy" style=color:violet>EscapeCode</a>] <a target="_blank" href="https://alcea-wisteria.de/PHP/0demo/2023-08-15-JSFiddle-Clone/htmls/2025-11-06-Html2Source.html" style=color:gray>HTML2SRC</a> <button onclick="pasteCharacter()">QUOTE</button>
+&nbsp;<button onclick="const url=document.getElementById('urlInput').value.trim();if(url && new RegExp('^(https?|ftp)://').test(url))document.getElementById('textbox').value='💬'+url+'#💬 \n•acws #acws\n'+document.getElementById('textbox').value;else alert('Invalid Fediverse Post URL')">💬</button><input id="urlInput" style="border:none;width:250px;padding:5px" placeholder="Enter URL"/> <a target="_blank" href="/other/extra/scripts/fakesocialmedia/0ld/data_akkoma_update.php" style=color:blue>✨🆕</a>
+<br>
 <a href="#" id="pasteLink">#CurrListeningAlcea</a>
-<script>document.getElementById('pasteLink').addEventListener('click', function(event) {event.preventDefault();const textbox = document.getElementById('textbox');textbox.value += '#CurrListeningAlcea';textbox.focus();});</script><br>
+<script>document.getElementById('pasteLink').addEventListener('click', e => { e.preventDefault(); const t = document.getElementById('textbox'), p = t.selectionStart; t.value = t.value.slice(0, p) + '#CurrListeningAlcea' + t.value.slice(p); t.selectionStart = t.selectionEnd = p + '#CurrListeningAlcea'.length; });</script>
+<a href="#" id="pasteLinkacwssafe">-acws safe-</a>
+<script>
+document.getElementById('pasteLinkacwssafe').addEventListener('click', function(e) {e.preventDefault();const textbox = document.getElementById('textbox');textbox.value += '\n#repost •acws #acws'});
+</script>
+ [<a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/mtdposter.html?apikey=&instance=https://alceawis.com#https://alceawis.com/updatejson.php" style=color:lightpink>updt</a>]
+<details><summary>-</summary>[<a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/mtdposter.html?instance=1&apikey=2&htmlmodeno" style=color:blue>HTMLApiKeyPoster</a>]</details>
 
+<br>
 <?php
 error_reporting(0);
 ?>
@@ -92,33 +107,46 @@ function insertEmoji(emoji) {
 <a href="#" id="loadDataLink">Load</a>
 <input type="number" id="entryNumber" min="1" value="1" style="width: 40px; margin-left: 5px;">|
 <a href="#" id="submitEditLink">Submit Edit</a>
+ <a target="_blank" href="https://woof.tech/search?q=%40alcea%40alceawis.com&type=accounts" style=color:lightpink>check</a>
 <textarea id="originalTextbox" style="display:none;"></textarea>
 <script>
-  document.getElementById('loadDataLink').addEventListener('click', function(e) {
-    e.preventDefault();
-    const entryIndex = parseInt(document.getElementById('entryNumber').value, 10) - 1;
-    if (entryIndex < 0) {
-      alert('Please enter a number 1 or greater');
-      return;
-    }
+function loadEntryByReversedNumber(entryNum) {
     fetch('/other/extra/scripts/fakesocialmedia/data_alcea.json', { cache: 'no-cache' })
       .then(response => response.json())
       .then(data => {
-        if (entryIndex >= data.length) {
+        const reversedIndex = data.length - entryNum;
+
+        if (reversedIndex < 0 || reversedIndex >= data.length) {
           alert('Entry number exceeds data length');
           return;
         }
-        const entry = data[entryIndex];
+
+        const entry = data[reversedIndex];
         const innerKey = Object.keys(entry)[0];
         const value = entry[innerKey].value;
+
         document.getElementById('textbox').value = value;
         document.getElementById('originalTextbox').value = value;
       })
       .catch(error => {
         console.error('Error loading data:', error);
       });
+  }
+
+  // Handle Load click
+  document.getElementById('loadDataLink').addEventListener('click', function(e) {
+    e.preventDefault();
+    const userEntry = parseInt(document.getElementById('entryNumber').value, 10);
+
+    if (userEntry < 1) {
+      alert('Please enter a number 1 or greater');
+      return;
+    }
+
+    loadEntryByReversedNumber(userEntry);
   });
 
+  // Handle Submit Edit
   document.getElementById('submitEditLink').addEventListener('click', function(e) {
     e.preventDefault();
     const newText = document.getElementById('textbox').value;
@@ -128,6 +156,18 @@ function insertEmoji(emoji) {
       original: originalText
     });
     window.location.href = 'edit.php?' + params.toString();
+  });
+
+  // Prefill entryNumber with the last entry number on page load (reversed numbering)
+  window.addEventListener('DOMContentLoaded', function() {
+    fetch('/other/extra/scripts/fakesocialmedia/data_alcea.json', { cache: 'no-cache' })
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('entryNumber').value = data.length;
+      })
+      .catch(error => {
+        console.error('Error preloading entry number:', error);
+      });
   });
 </script>
 
@@ -178,6 +218,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["specificButton"])) {
     <textarea id="textbox" name="textbox" rows="4" cols="50"></textarea>
     <input type="submit" name="specificButton" value="Submit" disabled>
 </form>
+<button type="button" id="checkButton">Check</button>
+<script src="/other/extra/scripts/fakesocialmedia/check.js"></script>
+<script>
+  document.getElementById("checkButton").addEventListener("click", function () {
+    if (typeof check === "function") {
+      check();
+    }
+  });
+</script>
+
+<!--Dupfinder-Button-->
+<div class="dupfind"></div>
+<script>
+document.getElementById("checkButton").addEventListener("click",(function(){const t=this,e=document.querySelector(".dupfind");if(e.textContent="",t.textContent="Loading...",document.getElementById("checkJsScript"))t.textContent="Check","function"==typeof window.checkDuplicates?window.checkDuplicates({inputId:"textbox",outputSelector:".dupfind",button:t}):e.textContent="checkDuplicates() function not found";else{const c=document.createElement("script");c.id="checkJsScript",c.src="/other/extra/scripts/fakesocialmedia/check.js",c.onload=()=>{t.textContent="Check","function"==typeof window.checkDuplicates?window.checkDuplicates({inputId:"textbox",outputSelector:".dupfind",button:t}):e.textContent="check.js loaded, but checkDuplicates() not found"},c.onerror=()=>{t.textContent="Check",e.textContent="Failed to load check.js"},document.body.appendChild(c)}}));
+</script>
 
 
 
