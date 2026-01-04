@@ -1,10 +1,7 @@
 
-<details><summary style="color: transparent; text-decoration: none;">title</summary> <a href="post_barebones.php" onclick="this.href='post_barebones.php' + window.location.search">Go to post_barebones.php</a>
-</details>
 
 
 <iframe src="/other/extra/scripts/fakesocialmedia/lastshorthands.html" id="iframe" width="100%" height="150"></iframe> <br><hr>
-    <script src="/other/extra/scripts/libraries/crypto-js.min.js"></script>
 <script>
     window.addEventListener('message', (event) => {
         if (event.origin !== window.location.origin) {
@@ -108,6 +105,7 @@ function insertEmoji(emoji) {
 <input type="number" id="entryNumber" min="1" value="1" style="width: 40px; margin-left: 5px;">|
 <a href="#" id="submitEditLink">Submit Edit</a>
  <a target="_blank" href="https://woof.tech/search?q=%40alcea%40alceawis.com&type=accounts" style=color:lightpink>check</a>
+<a href="/githubrepo.html?namefilter=acws,akko,infosec" target="_blank">RepoLinks 🔗</a>
 <textarea id="originalTextbox" style="display:none;"></textarea>
 <script>
 function loadEntryByReversedNumber(entryNum) {
@@ -218,17 +216,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["specificButton"])) {
     <textarea id="textbox" name="textbox" rows="4" cols="50"></textarea>
     <input type="submit" name="specificButton" value="Submit" disabled>
 </form>
-<button type="button" id="checkButton">Check</button>
-<script src="/other/extra/scripts/fakesocialmedia/check.js"></script>
-<script>
-  document.getElementById("checkButton").addEventListener("click", function () {
-    if (typeof check === "function") {
-      check();
-    }
-  });
-</script>
-
-
 
 
 <br>
@@ -240,14 +227,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["specificButton"])) {
 </details>
 <br>
 
-
+<button type="button" id="checkButton">Check</button>
+<script src="/other/extra/scripts/fakesocialmedia/check.js"></script>
+<script>
+  document.getElementById("checkButton").addEventListener("click", function () {
+    if (typeof check === "function") {
+      check();
+    }
+  });
+</script>
 
 <!--Dupfinder-Button-->
 <div class="dupfind"></div>
 <script>
 document.getElementById("checkButton").addEventListener("click",(function(){const t=this,e=document.querySelector(".dupfind");if(e.textContent="",t.textContent="Loading...",document.getElementById("checkJsScript"))t.textContent="Check","function"==typeof window.checkDuplicates?window.checkDuplicates({inputId:"textbox",outputSelector:".dupfind",button:t}):e.textContent="checkDuplicates() function not found";else{const c=document.createElement("script");c.id="checkJsScript",c.src="/other/extra/scripts/fakesocialmedia/check.js",c.onload=()=>{t.textContent="Check","function"==typeof window.checkDuplicates?window.checkDuplicates({inputId:"textbox",outputSelector:".dupfind",button:t}):e.textContent="check.js loaded, but checkDuplicates() not found"},c.onerror=()=>{t.textContent="Check",e.textContent="Failed to load check.js"},document.body.appendChild(c)}}));
 </script>
-
 
 
 <!----Text-Clip--handler--->
@@ -283,35 +277,8 @@ document.getElementById("checkButton").addEventListener("click",(function(){cons
 </form>
 <a target="_blank" href="post2mtd.html" style=color:blue>Post2Mtd</a> <a target="_blank" href="https://alcea-wisteria.de/PHP//0demo/2023-08-15-JSFiddle-Clone/htmls/2023-11-04-Advanced-mtd-tl-renderer-w-Query-string-support.html?instance=mas.to&userid=111958546062297646" style=color:blue>TimeLine</a>
 <a target="_blank" href="https://mas.to/@arusea.rss" style=color:blue>RSS</a> <!--[<a target="_blank" href="https://alceawis.de/other/extra/scripts/fakesocialmedia/post.php?user=alcea&mode=lowbandwidth" style=color:blue>Lowbandwidth</a>]---> <a target="_blank" href="del.php?user=alcea" style=color:blue>del</a>
-<?php
-$user = $_GET['user'];
-$uniqueId = uniqid();
-$iframeSrc = "data_{$user}.json?v={$uniqueId}";
-echo '<iframe src="' . $iframeSrc . '" style="border:0px #ffffff none;" name="statusit" scrolling="no" frameborder="0" marginheight="0px" marginwidth="0px" height="250px" width="800" allowfullscreen></iframe>';
-?>
-<br><iframe src="
-/other/extra/scripts/fakesocialmedia/check.php
-" style="border:0px #ffffff none;" name="statusit" scrolling="no" frameborder="0" marginheight="0px" marginwidth="0px" height="25px" width="100%" allowfullscreen></iframe>
-<!--<iframe src="
-/fakesocialrender_limited.html?user=alcea
-" style="border:0px #ffffff none;" name="statusit" scrolling="no" frameborder="0" marginheight="0px" marginwidth="0px" height="6000px" width="100%" allowfullscreen></iframe>-->
 
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script type="text/javascript">
-$(document).ready(function(){
-var baseUrl = "/fakesocialrender_limited.html";
-$("#mtdcomm").load(baseUrl + "");
-});
-</script>
-<div class="formClass">
-<div id="mtdcomm">
-</div>
-</div>
-
-
-
-    <script type="text/javascript">
+   <script type="text/javascript">
         function enableButtonIfAdmin() {
             const queryString = window.location.search;
             const urlParams = new URLSearchParams(queryString);
@@ -326,3 +293,4 @@ $("#mtdcomm").load(baseUrl + "");
         }
         window.onload = enableButtonIfAdmin;
     </script>
+
