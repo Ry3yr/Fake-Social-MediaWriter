@@ -1,3 +1,5 @@
+<a href="javascript:(function(){const urlParams=new URLSearchParams(window.location.search);const text=urlParams.get('text');if(text){window.location.href='/About.html?user=alcea&all=yes&limit=4854&text='+encodeURIComponent(text);}else{alert('No text parameter found');}})();"> Reload proper</a> <a href="#" onclick="window.location.href = window.location.href.replace('/commentload.html', '/quotepost.html');">QuotePost</a> <hr>
+
 <meta charset="UTF-8">
 <style>
   body {
@@ -315,7 +317,7 @@
 
               const buttonElement = document.createElement('button');
               buttonElement.classList.add('btn');
-              const buttonText = value.slice(0, 25) || 'btn';
+              const buttonText = value.slice(0, 40) || 'btn';
               buttonElement.textContent = 'Comment';
               buttonElement.addEventListener('click', () => {
                   window.open(`/other/extra/scripts/fakesocialmedia/comment.php?text=${encodeURIComponent(buttonText)}`, '_blank');

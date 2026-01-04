@@ -1,0 +1,181 @@
+<!---<button id="copyBtn" onclick="this.textContent='Quote post copied!';navigator.clipboard.writeText(location.pathname+location.search+location.hash)">Copy Path</button>--->
+<button id="copyBtn" style="display:none">Copy Page Embed</button>
+<script>const b=document.getElementById("copyBtn");function c(){navigator.clipboard.writeText(`\n<div style="position:relative;width:55vw;height:89vh">\n<iframe src="${location.href}" style="width:100%;height:100%;border:0;pointer-events:none" onload="(()=>{const i=this,d=i.contentDocument,e=d.documentElement;d.body.style.overflow=e.style.overflow='hidden';const r=()=>{let s=Math.min(i.clientWidth/e.scrollWidth,i.clientHeight/e.scrollHeight);e.style.transform='scale('+s+')';e.style.transformOrigin='0 0';i.style.height=e.scrollHeight*s+'px'};r();new ResizeObserver(r).observe(e)})()"></iframe>\n<a href="${location.href}" target="_blank" style="position:absolute;inset:0;z-index:1"></a>\n</div>\n`).then((()=>{b.textContent="QUOTE COPIED",b.disabled=1}))}window.self===window.top&&(b.style.display="inline-block"),b.onclick=c;</script>
+
+<!---<script>
+(()=>{if(!new URLSearchParams(location.search).has("quotepost"))return;if(window.self!==window.top)return;const n=document.createElement("button");n.textContent="COPY QUOTE",n.style.cssText="\n    position:fixed;\n    inset:0;\n    margin:auto;\n    width:100%;\n    height:100%;\n    font-size:30px;\n    font-weight:700;\n    border-radius:14px;\n    border:0;\n    cursor:pointer;\n    background:#000;\n    color:#fff;\n    z-index:99999;\n  ",document.body.appendChild(n),n.onclick=()=>{const e=`\n<div style="position:relative;width:55vw;height:89vh">\n<iframe src="${location.href}"\n  style="width:100%;height:100%;border:0;pointer-events:none"\n  onload="(()=>{\n    const i=this,d=i.contentDocument,e=d.documentElement;\n    d.body.style.overflow=e.style.overflow='hidden';\n    const r=()=>{\n      let s=Math.min(\n        i.clientWidth/e.scrollWidth,\n        i.clientHeight/e.scrollHeight\n      );\n      e.style.transform='scale('+s+')';\n      e.style.transformOrigin='0 0';\n      i.style.height=e.scrollHeight*s+'px'\n    };\n    r();\n    new ResizeObserver(r).observe(e)\n  })()">\n</iframe>\n<a href="${location.href}" target="_blank"\n   style="position:absolute;inset:0;z-index:1"></a>\n</div>\n`;navigator.clipboard.writeText(e),n.textContent="QUOTE COPIED",n.disabled=!0,window.close()}})();
+</script>-->
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>body{font-family:Arial;margin:0;padding:0;line-height:1.6;width:100%;max-width:none}.post{border:1px solid #ddd;padding:15px;margin:15px;border-radius:5px}.date{color:#666;font-size:.9em;margin-bottom:5px}.hashtags{margin-top:10px;color:#555}.tag{display:inline-block;margin-right:5px}a{color:#06c;text-decoration:none}a:hover{text-decoration:underline}blockquote{border-left:3px solid #ccc;padding-left:10px;margin:10px 0;color:#555}button{padding:5px 10px;margin-top:10px;cursor:pointer}#results{width:100%}.container{width:100%;padding:0}</style>
+</head>
+<body>
+<!--<a href="javascript:(function(){const e=new URLSearchParams(window.location.search);const t=e.get('text');t?window.location.href='/About.html?user=alcea&all=yes&limit=4854&text='+encodeURIComponent(t):alert('No text parameter found')})();">Reload proper</a>-->
+<hr>
+<div id="results"></div>
+<!--<h2>Comments</h2>-->
+<!--<div id="comments"></div>-->
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+fetch('/other/extra/scripts/fakesocialmedia/data_alcea.json?v='+Date.now()).then(e=>e.json()).then(e=>{
+const t=new URLSearchParams(window.location.search);
+const a=t.get('text');
+const n=t.get('number')||40;
+const o=e.slice(0,n).filter(e=>{
+const t=Object.keys(e)[0];
+return e[t].value.toLowerCase().includes(a.toLowerCase());
+});
+const r=document.getElementById('results');
+if(r){
+o.forEach((o,s)=>{
+const l=Object.keys(o)[0];
+const c="alcea";
+const d=o[l].value;
+const u=o[l].hashtags.split(', ');
+const i=document.createElement('div');
+i.classList.add('post');
+const p=e.indexOf(o);
+const m=e.length-p;
+const h=document.createElement('p');
+h.classList.add('date');
+h.textContent=`ID: ${m} * ${l}`;
+i.appendChild(h);
+const g=document.createElement('p');
+g.innerHTML=`<img src="https://alcea-wisteria.de/z_files/emoji/alcea.png" width="100px"><br>@<a target="_blank" href="/fakesocialrender_limited.html?user=${c}" style="color:pink">${c}</a>: ${(function(e){
+return e.replace(/𒐫([^𒐫]+)𒐫/g,'<blockquote>$1</blockquote>').replace(/:(\w+):/g,(e,t)=>`https://alcea-wisteria.de/z_files/emoji/${t}.gif`).replace(/(https?:\/\/[^\s]+)/g,(e=>{
+if(e.includes('youtube.com')||e.includes('youtu.be')){
+const t=(e.match(/(?:v=|\/(?:embed|v|shorts)\/|youtu\.be\/|vi\/)([a-zA-Z0-9_-]{11})/)||[])[1];
+if(t)return`<iframe src="https://www.youtube.com/embed/${t}" width="100%" height="400" allowfullscreen></iframe>`
+}
+if(e.includes('pixiv.net')){
+const t=(e.match(/https?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/(\d+)/)||[])[1];
+if(t)return`<div><img src="https://embed.pixiv.net/decorate.php?illust_id=${t}&mode=sns-automator" width="100%" style="max-width:800px"></div><br><a href="${e}" target="_blank">${e}</a>`
+}
+if(e.endsWith('.gif')||e.endsWith('.png')||e.endsWith('.webp')||e.endsWith('.jpg')||e.endsWith('.jpeg')){
+if(e.includes("emoji"))return`<img src="${e}" width="45px" alt="${e}">`;
+return`<img src="${e}" width="100%" style="max-width:800px" alt="${e}"><br><a href="${e}" target="_blank">${e}</a>`
+}
+return`<a href="${e}" target="_blank">${e}</a>`
+})).replace(/\n/g,'<br>')})(d)}`;
+i.appendChild(g);
+if(d.includes("•acws")){
+async function e(e,t=3){
+try{const a=await fetch(e,{cache:"no-store"});if(!a.ok)throw new Error(`HTTP error ${a.status} (${a.statusText}) while fetching ${e}`);const n=await a.text();if(n.length<100)throw new Error(`Fetched data too short: ${n.length} bytes`);try{const a=JSON.parse(n);return Array.isArray(a)?a:a&&Array.isArray(a.json)?a.json:(()=>{throw new Error(`Unexpected JSON structure in ${e}`)})()}catch(e){throw new Error(`JSON parsing failed for ${e}: ${e.message}`)}}catch(e){if(t>0){console.warn(`Fetch failed, retrying... (${t} left)\nReason: ${e.message}`);await new Promise(e=>setTimeout(e,1e3));return e(e,t-1)}throw e}}
+function t(e){return e.replace(/\r\n/g,'\n').replace(/\r/g,'\n')}
+function a(e){return t(e).normalize('NFC').trim()}
+function n(e){return a(e).replace(/\n/g,'')}
+function o(e){return e.replace(/\r\n|\r/g,'\n').replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'').normalize('NFC')}
+e("/other/extra/scripts/fakesocialmedia/0ld/data_akkoma.json").then(r=>{
+if(!r)throw new Error("JSON parse failure");
+let s=null,l=null,c=null;
+const p=d;
+const m=a(d);
+const u=n(d);
+for(const e of r){
+if(!e.preview)continue;
+const t=e.preview;
+const a=o(t);
+const n=u;
+if(p.startsWith(t)){s=e.url,l=t,c='raw';break}
+if(m.startsWith(a)){s=e.url,l=t,c='normalized';break}
+if(u.startsWith(n)){s=e.url,l=t,c='noBreaks';break}
+const i=30;
+const h=m.indexOf(a);
+if(h>=0&&h<=i){s=e.url,l=t,c='loose';break}}
+if(!s){
+const e=o(d);
+const t=30;
+for(const a of r){
+if(!a.preview)continue;
+const n=a.preview;
+const i=o(n);
+const h=e.indexOf(i);
+if(h>=0&&h<=t){s=a.url,l=n,c='finalNormalized';break}}}
+if(!s){
+for(const e of r){
+if(!e.preview)continue;
+const t=e.preview;
+if(p===t){s=e.url,l=t,c='exact';break}}}
+if(s){
+const e=document.createElement('div');
+e.style.width='100%';
+const t=document.createElement('a');
+t.target="_blank";
+t.classList.add('btn2');
+//t.href=s;
+t.href = s.replace(/#/g, '%23'); // Escape # as %23
+t.textContent="Permalink (match found)";
+const a=document.createElement('div');
+a.style.fontSize='0.8em';
+a.style.marginTop='5px';
+switch(c){
+case'raw':a.style.color='green';a.textContent=`✔ Match found on first try (raw):\nPreview: "${l}"\nPost value: "${p.slice(0,l.length+20)}..."`;break;
+case'normalized':a.style.color='lightgreen';a.textContent=`✔ Match found after normalization:\nPreview: "${l}"\nPost value: "${p.slice(0,l.length+20)}..."`;break;
+case'noBreaks':a.style.color='lightblue';a.textContent=`✔ Match found after removing line breaks:\nPreview: "${l}"\nPost value: "${p.slice(0,l.length+20)}..."`;break;
+case'loose':a.style.color='orange';a.textContent=`✔ Loose match found (near start of post):\nPreview: "${l}"\nPost value: "${p.slice(0,l.length+20)}..."`;break;
+case'finalNormalized':a.style.color='purple';a.textContent=`✔ Match found after final normalization:\nPreview: "${l}"\nPost value: "${p.slice(0,l.length+20)}..."`;break;
+case'exact':a.style.color='blue';a.textContent=`✔ Exact match found:\nPreview: "${l}"\nPost value: "${p.slice(0,l.length+20)}..."`;break}
+e.appendChild(t);
+e.appendChild(a);
+const n=document.createElement('div');
+n.style.width='100%';
+const o=document.createElement('iframe');
+//o.src=`/other/extra/scripts/fakesocialmedia/replyhandler.html?url=${encodeURIComponent(s)}`;
+o.style.border='none';
+o.style.height='65px';
+o.style.width='100%';
+o.style.overflow='auto';
+o.onload=function(){const e=o.contentDocument||o.contentWindow.document;function t(){const t=e.body.scrollHeight;o.style.height=`${t+33}px`}t();setInterval(t,3e3)};
+n.appendChild(o);
+e.appendChild(n);
+i.appendChild(e)}}).catch(e=>{
+console.error("Fetch error:",e);
+const t=document.createElement('a');
+t.classList.add('btn2');
+t.href="#";
+t.textContent="Fetch error";
+const a=document.createElement('div');
+a.style.color='red';
+a.style.fontFamily='monospace';
+a.style.fontSize='0.9em';
+a.style.marginTop='5px';
+a.textContent=`❌ Reason: ${e.message}`;
+i.appendChild(t);
+i.appendChild(a)})}
+const f=document.createElement('div');
+f.classList.add('hashtags');
+u.forEach(e=>{
+const t=document.createElement('span');
+t.classList.add('tag');
+t.textContent=`#${e}`;
+f.appendChild(t)});
+i.appendChild(f);
+const b=document.createElement('button');
+//b.classList.add('btn');
+//b.textContent='Comment';
+//b.addEventListener('click',()=>{
+//window.open(`/other/extra/scripts/fakesocialmedia/comment.php?text=${encodeURIComponent(d.slice(0,40))}`,'_blank')});
+//i.appendChild(b);
+r.appendChild(i)})}else console.error('Error: Results container not found.')}).catch(e=>{console.error('Error fetching data:',e)})});
+function fetchAndDisplayComments(){
+const e=new URLSearchParams(window.location.search);
+const t=(e.get('text')||'').toString().toLowerCase().normalize();
+fetch('/other/extra/scripts/fakesocialmedia/comments.json?v='+Date.now()).then(e=>e.json()).then(e=>{
+const a=e.filter(e=>{
+const a=(e.text||'').toString().toLowerCase().normalize();
+return a.includes(t)});
+const n=document.getElementById('comments');
+a.forEach(e=>{
+const t=document.createElement('div');
+t.textContent=e.value;
+n.appendChild(t)})}).catch(e=>{console.error('Error fetching comments:',e)})}
+window.onload=fetchAndDisplayComments;
+</script>
+</body>
+</html>
