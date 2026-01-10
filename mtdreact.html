@@ -1,0 +1,600 @@
+<iframe src="/other/extra/scripts/fakesocialmedia/lastshorthands.html" id="iframe" width="100%" height="150"></iframe> <br><hr>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Akkoma Poster - Enhanced</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 20px; }
+    label { display: block; margin: 10px 0 5px; }
+    input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
+    textarea { height: 60px; resize: vertical; }
+    button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+    #postDisplay { margin-top: 20px; border: 1px solid #ccc; padding: 15px; border-radius: 5px; }
+    #actions { margin: 15px 0; }
+    .emoji-reaction { background: #f0f0f0; border-radius: 20px; padding: 5px 10px; margin: 3px; display: inline-block; }
+    #statusMessage { padding: 10px; margin: 10px 0; border-radius: 4px; display: none; }
+    .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .loading { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+    .link-section { margin: 15px 0; padding: 12px; background: #f5f5f5; border-radius: 4px; border-left: 5px solid #4CAF50; }
+  </style>
+</head>
+<body>
+  <h2>Akkoma Poster - Enhanced</h2>
+
+  <div id="statusMessage"></div>
+
+  <label>Instance URL:</label>
+  <input type="text" id="instance" placeholder="https://your.instance.tld" />
+
+  <label>API Key:</label>
+  <details><summary>uWu Wats diz ?</summary>
+  <input type="text" id="apikey" /></details>
+  
+  <button id="readBtn" onclick="readFromStorage()">Read from Storage</button>
+
+  <br><br>
+  
+  <label>Post URL:</label>
+  <input type="text" id="postUrl" placeholder="https://instance.tld/users/username/statuses/123456 or https://instance.tld/notes/noteid" 
+         oninput="loadPostFromUrl()" />
+  
+  <div id="postDisplay" style="display: none;">
+    <div style="display: flex; align-items: center; margin-bottom: 15px;">
+      <img id="avatar" src="" style="width: 50px; height: 50px; border-radius: 50%; margin-right: 10px;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2245%22 fill=%22%23ccc%22/></svg>';" />
+      <div>
+        <strong id="username">Username</strong><br>
+        <span id="timestamp">Timestamp</span>
+      </div>
+    </div>
+    <div id="postContent" style="margin: 15px 0;"></div>
+    <div id="postStats" style="color: #666; font-size: 0.9em; margin: 10px 0;"></div>
+    
+    <!-- ADDED: Link section for remote and home URLs -->
+    <div id="linkSection" class="link-section" style="display: none;">
+        <div style="margin-bottom: 5px;">
+            <strong>REMOTE POST:</strong> 
+            <a id="remoteLink" href="#" target="_blank" style="color: #0066cc;"></a>
+        </div>
+        <div>
+            <strong>HOME INSTANCE:</strong> 
+            <a id="homeLink" href="#" target="_blank" style="color: #4CAF50; font-weight: bold;">Resolving...</a>
+        </div>
+    </div>
+    
+    <div id="actions" style="margin-top: 20px;">
+      <button id="boostBtn" onclick="resolveAndExecute('boost')">🔁 Boost</button>
+      <button id="favoriteBtn" onclick="resolveAndExecute('fav')">❤️ Favorite</button>
+      <div style="margin: 15px 0;">
+        <label for="textbox">Emoji Reaction:</label>
+        <textarea id="textbox" name="textbox" placeholder="Enter emojis or shortcodes like:
+:smile:
+:fire:
+🎉
+❤️
+:custom_emoji:"></textarea>
+        <button onclick="resolveAndExecute('emoji')">React with Emojis</button>
+      </div>
+      <div id="currentReactions" style="margin-top: 10px;">
+        <strong>Current Reactions:</strong>
+        <div id="reactionsList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+// Add this function to handle emoji selection
+function handleEmojiSelection(emoji) {
+  const textarea = document.getElementById('textbox');
+  const currentValue = textarea.value.trim();
+  
+  if (currentValue) {
+    textarea.value = currentValue + '\n' + emoji;
+  } else {
+    textarea.value = emoji;
+  }
+  textarea.focus();
+}
+
+// Add this event listener to listen for messages from the iframe
+window.addEventListener('message', function(event) {
+  if (event.data.type === 'shorthandSelected' || event.data.type === 'emojiSelected') {
+    handleEmojiSelection(event.data.shorthand);
+  }
+});
+    let currentPostData = null;
+    let currentPlatform = null;
+    let currentLocalId = null; // For resolved local post ID
+    let homePostUrl = null; // For storing the home instance post URL
+
+    function showStatus(message, type = 'info') {
+      const statusDiv = document.getElementById('statusMessage');
+      statusDiv.textContent = message;
+      statusDiv.className = type;
+      statusDiv.style.display = 'block';
+      
+      if (type !== 'loading') {
+        setTimeout(() => {
+          statusDiv.style.display = 'none';
+        }, 5000);
+      }
+    }
+
+    async function loadPostFromUrl() {
+      const url = document.getElementById('postUrl').value.trim();
+      if (!url) {
+        document.getElementById('postDisplay').style.display = 'none';
+        document.getElementById('linkSection').style.display = 'none';
+        return;
+      }
+      
+      showStatus('Loading post...', 'loading');
+      
+      try {
+        const urlObj = new URL(url);
+        const instance = urlObj.hostname;
+        const pathParts = urlObj.pathname.split('/').filter(Boolean);
+        
+        // Check if it's a Misskey URL
+        if (pathParts.includes('notes')) {
+          currentPlatform = 'misskey';
+          const noteIndex = pathParts.indexOf('notes');
+          const noteId = pathParts[noteIndex + 1];
+          currentPostData = await fetchMisskeyPost(instance, noteId);
+        } 
+        // Check if it's a Mastodon/Akkoma URL
+        else {
+          currentPlatform = 'mastodon';
+          const statusId = pathParts[pathParts.length - 1];
+          currentPostData = await fetchMastodonPost(instance, statusId);
+        }
+        
+        if (currentPostData) {
+          displayPost(currentPostData);
+          await loadReactions();
+        }
+        
+        showStatus('Post loaded successfully', 'success');
+        
+        // RESOLVE TO HOME INSTANCE (AUTO-RESOLVE)
+        await resolveToHome(url);
+        
+      } catch (error) {
+        console.error('Error loading post:', error);
+        showStatus(`Error: ${error.message}`, 'error');
+      }
+    }
+    
+    // AUTO-RESOLVE: Resolve remote post to home instance (from base64 code)
+    // AUTO-RESOLVE: Resolve remote post to home instance (from base64 code)
+    async function resolveToHome(remoteUrl) {
+        const homeBase = document.getElementById('instance').value.trim().replace(/\/$/, "");
+        const key = document.getElementById('apikey').value.trim();
+        const homeLinkEl = document.getElementById('homeLink');
+        
+        if (!homeBase || !key) {
+            homeLinkEl.textContent = "Missing home instance config";
+            homeLinkEl.style.color = '#ff9800';
+            return;
+        }
+        
+        try {
+            const headers = { 'Authorization': `Bearer ${key}` };
+            const res = await fetch(`${homeBase}/api/v2/search?q=${encodeURIComponent(remoteUrl)}&resolve=true&type=statuses`, { headers });
+            const data = await res.json();
+            
+            if (data.statuses?.length) {
+                const localPost = data.statuses[0];
+                currentLocalId = localPost.id;
+                
+                // DEBUG: Log what we received
+                console.log("Search result:", localPost);
+                console.log("pleroma data:", localPost.pleroma);
+                console.log("url:", localPost.url);
+                
+                // Get home instance URL - IMPORTANT: Check if this is actually a local post
+                // For Akkoma/Pleroma, local posts have pleroma.local_view
+                // For Mastodon, we need to check if the URL domain matches home instance
+                let validHomeUrl = null;
+                
+                // First try pleroma.local_view (Akkoma/Pleroma specific)
+                if (localPost.pleroma?.local_view) {
+                    validHomeUrl = localPost.pleroma.local_view;
+                } 
+                // If no local_view, check if the URL is from our home instance
+                else if (localPost.url) {
+                    const postUrlObj = new URL(localPost.url);
+                    const homeUrlObj = new URL(homeBase);
+                    
+                    // If the post URL is from our home instance, use it
+                    if (postUrlObj.hostname === homeUrlObj.hostname) {
+                        validHomeUrl = localPost.url;
+                    } else {
+                        // This is still a remote URL, not a local one
+                        // Try to construct local URL from the ID
+                        validHomeUrl = `${homeBase}/notice/${currentLocalId}`;
+                    }
+                }
+                
+                // If we still don't have a valid URL, construct one
+                if (!validHomeUrl) {
+                    validHomeUrl = `${homeBase}/notice/${currentLocalId}`;
+                }
+                
+                homePostUrl = validHomeUrl;
+                
+                homeLinkEl.href = validHomeUrl;
+                homeLinkEl.textContent = validHomeUrl;
+                homeLinkEl.style.color = '#4CAF50';
+                
+                console.log(`RESOLVED: Local ID ${currentLocalId}`);
+                console.log(`HOME URL: ${validHomeUrl}`);
+            } else {
+                currentLocalId = null;
+                homePostUrl = null;
+                homeLinkEl.textContent = "Not found on home instance.";
+                homeLinkEl.style.color = '#ff9800';
+            }
+        } catch (e) {
+            homeLinkEl.textContent = `Resolve error: ${e.message}`;
+            homeLinkEl.style.color = '#ff9800';
+            console.log(`Resolve Error: ${e.message}`);
+        }
+        
+        // Show the link section
+        const linkSection = document.getElementById('linkSection');
+        const remoteLink = document.getElementById('remoteLink');
+        linkSection.style.display = 'block';
+        remoteLink.href = remoteUrl;
+        remoteLink.textContent = remoteUrl;
+    }
+    // Unified action handler
+    async function resolveAndExecute(type) {
+      const homeBase = document.getElementById('instance').value.trim().replace(/\/$/, "");
+      const key = document.getElementById('apikey').value.trim();
+      
+      if (!homeBase || !key) {
+        showStatus('Please enter instance URL and API key', 'error');
+        return;
+      }
+      
+      if (!currentLocalId) {
+        // Try to resolve if we haven't yet (AUTO-RESOLVE RETRY)
+        const remoteUrl = document.getElementById('postUrl').value.trim();
+        if (remoteUrl) {
+          await resolveToHome(remoteUrl);
+        }
+        if (!currentLocalId) {
+          showStatus("Not resolved to home instance", "error");
+          return;
+        }
+      }
+      
+      showStatus(`Applying ${type}...`, 'loading');
+      
+      try {
+        const headers = { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' };
+        
+        if (type === 'emoji') {
+            const emojis = document.getElementById('textbox').value.split(/[\n\s,]+/).filter(e => e.trim());
+            let successCount = 0;
+            
+            for (const emoji of emojis) {
+                const clean = emoji.replace(/:/g, "");
+                const res = await fetch(`${homeBase}/api/v1/pleroma/statuses/${currentLocalId}/reactions/${encodeURIComponent(clean)}`, { 
+                  method: "PUT", 
+                  headers 
+                });
+                
+                if (res.ok) {
+                  successCount++;
+                  // Update local reaction count
+                  if (!currentPostData.reactions) {
+                    currentPostData.reactions = {};
+                  }
+                  currentPostData.reactions[clean] = (currentPostData.reactions[clean] || 0) + 1;
+                }
+            }
+            
+            // Clear textarea after successful reactions
+            if (successCount > 0) {
+              document.getElementById('textbox').value = '';
+            }
+            
+            // Update display
+            displayReactions(currentPostData.reactions || {});
+            
+            if (successCount > 0) {
+              showStatus(`Added ${successCount} reaction(s)`, 'success');
+            } else {
+              showStatus('Failed to add reactions', 'error');
+            }
+            
+        } else if (type === 'fav') {
+            const res = await fetch(`${homeBase}/api/v1/statuses/${currentLocalId}/favourite`, { 
+              method: "POST", 
+              headers 
+            });
+            
+            if (res.ok) {
+              currentPostData.favourited = true;
+              currentPostData.favourites_count = (currentPostData.favourites_count || 0) + 1;
+              displayPost(currentPostData);
+              showStatus('Favorited!', 'success');
+            }
+            
+        } else if (type === 'boost') {
+            const res = await fetch(`${homeBase}/api/v1/statuses/${currentLocalId}/reblog`, { 
+              method: "POST", 
+              headers 
+            });
+            
+            if (res.ok) {
+              currentPostData.reblogged = true;
+              currentPostData.reblogs_count = (currentPostData.reblogs_count || 0) + 1;
+              displayPost(currentPostData);
+              showStatus('Boosted!', 'success');
+            }
+        }
+        
+        // Show the home URL after successful action
+        if (homePostUrl) {
+            const homeLinkEl = document.getElementById('homeLink');
+            homeLinkEl.textContent = homePostUrl + " ✓";
+            homeLinkEl.style.color = '#4CAF50';
+        }
+        
+      } catch (e) { 
+        console.error(e);
+        showStatus(`Error: ${e.message}`, 'error');
+      }
+    }
+    
+    async function fetchMisskeyPost(instance, noteId) {
+      const url = `https://${instance}/api/notes/show`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId: noteId })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Misskey API error: ${response.status}`);
+      }
+      
+      const misskeyData = await response.json();
+      return convertMisskeyNote(misskeyData, instance);
+    }
+    
+    async function fetchMastodonPost(instance, statusId) {
+      const url = `https://${instance}/api/v1/statuses/${statusId}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    }
+    
+    function convertMisskeyNote(note, instance) {
+      const user = note.user || {};
+      const files = note.files || [];
+      
+      return {
+        id: note.id,
+        content: note.text || '',
+        created_at: note.createdAt,
+        url: `https://${instance}/notes/${note.id}`,
+        replies_count: note.repliesCount || 0,
+        reblogs_count: note.renoteCount || 0,
+        favourites_count: note.reactionsCount || 0,
+        reblogged: note.myRenoteId !== undefined,
+        favourited: note.myReaction !== undefined,
+        reblogged_by_account: note.myRenoteId ? true : false,
+        favourited_by_account: note.myReaction ? true : false,
+        reactions: note.reactions || {},
+        media_attachments: files.map(file => ({
+          url: file.url || file.thumbnailUrl || file.originalUrl,
+          type: file.type?.startsWith('image/') ? 'image' : 'video',
+          description: file.comment || ''
+        })),
+        account: {
+          username: user.username || 'unknown',
+          acct: user.username || 'unknown',
+          display_name: user.name || user.username || 'Unknown',
+          avatar_static: user.avatarUrl || '',
+          avatar: user.avatarUrl || ''
+        }
+      };
+    }
+    
+    function displayPost(data) {
+      const display = document.getElementById('postDisplay');
+      
+      // Set avatar with fallback
+      const avatar = document.getElementById('avatar');
+      avatar.src = data.account.avatar || data.account.avatar_static || '';
+      
+      document.getElementById('username').textContent = data.account.display_name || `@${data.account.username}`;
+      document.getElementById('timestamp').textContent = new Date(data.created_at).toLocaleString();
+      document.getElementById('postContent').innerHTML = data.content;
+      
+      // Update button states
+      const boostBtn = document.getElementById('boostBtn');
+      const favoriteBtn = document.getElementById('favoriteBtn');
+      
+      if (data.reblogged || data.reblogged_by_account) {
+        boostBtn.textContent = '🔁 Boosted';
+        boostBtn.disabled = true;
+      } else {
+        boostBtn.textContent = '🔁 Boost';
+        boostBtn.disabled = false;
+      }
+      
+      if (data.favourited || data.favourited_by_account) {
+        favoriteBtn.textContent = '❤️ Favorited';
+        favoriteBtn.disabled = true;
+      } else {
+        favoriteBtn.textContent = '❤️ Favorite';
+        favoriteBtn.disabled = false;
+      }
+      
+      // Add stats
+      const statsHtml = `
+        ❤️ ${data.favourites_count || 0} 
+        🔁 ${data.reblogs_count || 0} 
+        💬 ${data.replies_count || 0}
+      `;
+      document.getElementById('postStats').innerHTML = statsHtml;
+      
+      // Display reactions if available
+      if (data.reactions) {
+        displayReactions(data.reactions);
+      }
+      
+      display.style.display = 'block';
+    }
+    
+    async function loadReactions() {
+      if (!currentPostData || !currentPlatform) return;
+      
+      try {
+        const urlObj = new URL(currentPostData.url);
+        const instance = urlObj.hostname;
+        
+        if (currentPlatform === 'misskey') {
+          const reactions = await fetchMisskeyReactions(instance, currentPostData.id);
+          displayReactions(reactions);
+        } else {
+          // For Mastodon/Akkoma, reactions are included in the status data
+          if (currentPostData.reactions) {
+            displayReactions(currentPostData.reactions);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading reactions:', error);
+      }
+    }
+    
+    async function fetchMisskeyReactions(instance, noteId) {
+      const url = `https://${instance}/api/notes/reactions`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId: noteId })
+      });
+      
+      if (!response.ok) return {};
+      return await response.json();
+    }
+    
+    function displayReactions(reactions) {
+      const reactionsList = document.getElementById('reactionsList');
+      reactionsList.innerHTML = '';
+      
+      if (!reactions || Object.keys(reactions).length === 0) {
+        reactionsList.innerHTML = '<em>No reactions yet</em>';
+        return;
+      }
+      
+      for (const [emoji, count] of Object.entries(reactions)) {
+        if (count > 0) {
+          const reactionDiv = document.createElement('div');
+          reactionDiv.className = 'emoji-reaction';
+          reactionDiv.textContent = `${emoji} × ${count}`;
+          reactionsList.appendChild(reactionDiv);
+        }
+      }
+    }
+    
+    // Backend communication function
+    async function postToBackend(action, postUrl, apiKey, instance, emoji = null) {
+      try {
+        const formData = new FormData();
+        formData.append('action', action);
+        formData.append('post_url', postUrl);
+        formData.append('api_key', apiKey);
+        formData.append('instance', instance);
+        if (emoji) {
+          formData.append('emoji', emoji);
+        }
+        
+        const response = await fetch('0ld/fediaction.php', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!response.ok) {
+          console.warn(`Backend POST failed: ${response.status}`);
+        } else {
+          console.log('Backend notified successfully');
+        }
+      } catch (error) {
+        console.error('Error posting to backend:', error);
+      }
+    }
+    
+    function readFromStorage() {
+      const apiKey = localStorage.getItem("apikey");
+      const instance = localStorage.getItem("instance");
+      if (apiKey && instance) {
+        document.getElementById("apikey").value = apiKey;
+        document.getElementById("instance").value = instance;
+        showStatus('Loaded from local storage', 'success');
+      } else {
+        showStatus('No data found in local storage', 'error');
+      }
+    }
+    
+    window.onload = function() {
+  const params = new URLSearchParams(window.location.search);
+  const apiKey = params.get("apikey");
+  const instance = params.get("instance");
+  const postUrl = params.get("post");
+
+  if (apiKey) {
+    document.getElementById("apikey").value = apiKey;
+    localStorage.setItem("apikey", apiKey);
+  }
+  if (instance) {
+    document.getElementById("instance").value = instance;
+    localStorage.setItem("instance", instance);
+    
+    // Reload iframe with instance-specific emoji filter
+    if (!instance.includes("https://alceawis.com") && 
+        !instance.includes("https://daffdasf.com")) {
+      
+      // Extract the domain/host from the instance URL
+      try {
+        const instanceUrl = new URL(instance);
+        const instanceHost = instanceUrl.hostname;
+        
+        // Construct the new iframe URL with emoji filter
+        const iframeUrl = `https://alceawis.de/other/extra/scripts/fakesocialmedia/lastshorthands.html?emojiinstancefilter=https://alceawis.de/other/extra/fetchdata/2024-03-07-FediTools/2025-08-17-EmojiDownloader/${instanceHost}.txt`;
+        
+        // Reload the iframe
+        const iframe = document.getElementById('iframe');
+        if (iframe) {
+          iframe.src = iframeUrl;
+        }
+      } catch (e) {
+        console.error("Invalid instance URL format:", e);
+      }
+    }
+  }
+  if (postUrl) {
+    document.getElementById("postUrl").value = postUrl;
+    setTimeout(() => loadPostFromUrl(), 500);
+  }
+  
+  if (localStorage.getItem("apikey") && localStorage.getItem("instance")) {
+    document.getElementById("readBtn").style.display = "inline-block";
+      }
+    };
+  </script>
+</body>
+</html>
+
+<!--Old-Garbage--code--broken--emoji--flow--to--textbox--PGlmcmFtZSBzcmM9Ii9vdGhlci9leHRyYS9zY3JpcHRzL2Zha2Vzb2NpYWxtZWRpYS9sYXN0c2hvcnRoYW5kcy5odG1sIiBpZD0iaWZyYW1lIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxNTAiPjwvaWZyYW1lPiA8YnI+PGhyPgo8IURPQ1RZUEUgaHRtbD4KPGh0bWwgbGFuZz0iZW4iPgo8aGVhZD4KICA8bWV0YSBjaGFyc2V0PSJVVEYtOCIgLz4KICA8dGl0bGU+QWtrb21hIFBvc3RlciAtIFRydWUgSG9tZSBMaW5rPC90aXRsZT4KICA8c3R5bGU+CiAgICBib2R5IHsgZm9udC1mYW1pbHk6IEFyaWFsLCBzYW5zLXNlcmlmOyBtYXgtd2lkdGg6IDgwMHB4OyBtYXJnaW46IDIwcHggYXV0bzsgcGFkZGluZzogMCAyMHB4OyBiYWNrZ3JvdW5kOiAjMTIxMjEyOyBjb2xvcjogd2hpdGU7IH0KICAgIGxhYmVsIHsgZGlzcGxheTogYmxvY2s7IG1hcmdpbjogMTBweCAwIDVweDsgZm9udC13ZWlnaHQ6IGJvbGQ7IH0KICAgIGlucHV0LCB0ZXh0YXJlYSB7IHdpZHRoOiAxMDAlOyBwYWRkaW5nOiAxMHB4OyBtYXJnaW4tYm90dG9tOiAxMHB4OyBib3gtc2l6aW5nOiBib3JkZXItYm94OyBib3JkZXItcmFkaXVzOiA0cHg7IGJvcmRlcjogMXB4IHNvbGlkICMzMzM7IGJhY2tncm91bmQ6ICMyYTJhMmE7IGNvbG9yOiB3aGl0ZTsgfQogICAgdGV4dGFyZWEgeyBoZWlnaHQ6IDYwcHg7IHJlc2l6ZTogdmVydGljYWw7IH0KICAgIGJ1dHRvbiB7IHBhZGRpbmc6IDEwcHggMTZweDsgbWFyZ2luOiA1cHg7IGN1cnNvcjogcG9pbnRlcjsgYm9yZGVyOiBub25lOyBib3JkZXItcmFkaXVzOiA0cHg7IGZvbnQtd2VpZ2h0OiBib2xkOyB9CiAgICAjcG9zdERpc3BsYXkgeyBtYXJnaW4tdG9wOiAyMHB4OyBib3JkZXI6IDFweCBzb2xpZCAjMzMzOyBwYWRkaW5nOiAxNXB4OyBib3JkZXItcmFkaXVzOiA4cHg7IGJhY2tncm91bmQ6ICMxZTFlMWU7IH0KICAgICNzdGF0dXNNZXNzYWdlIHsgcGFkZGluZzogMTBweDsgbWFyZ2luOiAxMHB4IDA7IGJvcmRlci1yYWRpdXM6IDRweDsgZGlzcGxheTogbm9uZTsgfQogICAgLnN1Y2Nlc3MgeyBiYWNrZ3JvdW5kOiAjMWI0MzMyOyBjb2xvcjogI2Q0ZWRkYTsgYm9yZGVyOiAxcHggc29saWQgIzJkNmE0ZjsgfQogICAgLmVycm9yIHsgYmFja2dyb3VuZDogIzcyMDkxNzsgY29sb3I6ICNmOGQ3ZGE7IGJvcmRlcjogMXB4IHNvbGlkICNhNDE2MWE7IH0KICAgIC5sb2FkaW5nIHsgYmFja2dyb3VuZDogIzMzMzsgY29sb3I6ICNmZmY7IGJvcmRlcjogMXB4IHNvbGlkICM1NTU7IH0KICAgICNjbGktZGVidWcgeyBiYWNrZ3JvdW5kOiAjMDAwOyBjb2xvcjogIzAwZmY0MTsgZm9udC1mYW1pbHk6IG1vbm9zcGFjZTsgcGFkZGluZzogMTVweDsgbWFyZ2luLXRvcDogMjBweDsgZm9udC1zaXplOiAxMnB4OyBib3JkZXI6IDFweCBzb2xpZCAjMzMzOyBtYXgtaGVpZ2h0OiAyNTBweDsgb3ZlcmZsb3cteTogYXV0bzsgYm9yZGVyLXJhZGl1czogNHB4OyBsaW5lLWhlaWdodDogMS40OyB9CiAgICAuY2xpLWVyciB7IGNvbG9yOiAjZmY0NTAwOyB9CiAgICAubGluay1zZWN0aW9uIHsgbWFyZ2luOiAxNXB4IDA7IHBhZGRpbmc6IDEycHg7IGJhY2tncm91bmQ6ICMyNTI1MjU7IGJvcmRlci1yYWRpdXM6IDRweDsgYm9yZGVyLWxlZnQ6IDVweCBzb2xpZCAjMDBmZjQxOyB9CiAgICAjcmVuZGVyRnJhbWUgeyB3aWR0aDogMTAwJTsgaGVpZ2h0OiA1MDBweDsgYm9yZGVyOiAxcHggc29saWQgIzMzMzsgbWFyZ2luLXRvcDogMTVweDsgZGlzcGxheTogbm9uZTsgYmFja2dyb3VuZDogd2hpdGU7IGJvcmRlci1yYWRpdXM6IDRweDsgfQogIDwvc3R5bGU+CjwvaGVhZD4KPGJvZHk+CiAgPGgyPkFra29tYSBQb3N0ZXIgLSBUcnVlIEhvbWUgTGluazwvaDI+CiAgPGRpdiBpZD0ic3RhdHVzTWVzc2FnZSI+PC9kaXY+CgogIDxsYWJlbD5Ib21lIEluc3RhbmNlIFVSTDo8L2xhYmVsPgogIDxpbnB1dCB0eXBlPSJ0ZXh0IiBpZD0iaW5zdGFuY2UiIHBsYWNlaG9sZGVyPSJodHRwczovL2FsY2Vhd2lzLmNvbSIgLz4KICA8bGFiZWw+QVBJIEtleTo8L2xhYmVsPgogIDxpbnB1dCB0eXBlPSJwYXNzd29yZCIgaWQ9ImFwaWtleSIgLz4KICA8YnV0dG9uIG9uY2xpY2s9InJlYWRGcm9tU3RvcmFnZSgpIiBzdHlsZT0iYmFja2dyb3VuZDogIzQ0NDsgY29sb3I6IHdoaXRlOyI+TG9hZCBTdG9yYWdlPC9idXR0b24+CgogIDxicj48YnI+CiAgPGxhYmVsPlJlbW90ZSBQb3N0IFVSTDo8L2xhYmVsPgogIDxpbnB1dCB0eXBlPSJ0ZXh0IiBpZD0icG9zdFVybCIgcGxhY2Vob2xkZXI9Imh0dHBzOi8vcmVtb3RlLnRsZC9AdXNlci8xMjMiIC8+CiAgCiAgPGRpdiBpZD0icG9zdERpc3BsYXkiIHN0eWxlPSJkaXNwbGF5OiBub25lOyI+CiAgICA8ZGl2IHN0eWxlPSJkaXNwbGF5OiBmbGV4OyBhbGlnbi1pdGVtczogY2VudGVyOyBtYXJnaW4tYm90dG9tOiAxNXB4OyI+CiAgICAgIDxpbWcgaWQ9ImF2YXRhciIgc3JjPSIiIHN0eWxlPSJ3aWR0aDogNTBweDsgaGVpZ2h0OiA1MHB4OyBib3JkZXItcmFkaXVzOiA1MCU7IG1hcmdpbi1yaWdodDogMTBweDsiIC8+CiAgICAgIDxkaXY+CiAgICAgICAgPHN0cm9uZyBpZD0idXNlcm5hbWUiPlVzZXJuYW1lPC9zdHJvbmc+PGJyPgogICAgICAgIDxzcGFuIGlkPSJ0aW1lc3RhbXAiPlBvc3QgUHJldmlldzwvc3Bhbj4KICAgICAgPC9kaXY+CiAgICA8L2Rpdj4KICAgIDxkaXYgaWQ9InBvc3RDb250ZW50IiBzdHlsZT0ibWFyZ2luOiAxNXB4IDA7Ij48L2Rpdj4KICAgIAogICAgPGRpdiBjbGFzcz0ibGluay1zZWN0aW9uIj4KICAgICAgICA8ZGl2IHN0eWxlPSJtYXJnaW4tYm90dG9tOiA1cHg7Ij48c3Ryb25nPlJFTU9URTo8L3N0cm9uZz4gPGEgaWQ9InJlbW90ZUxpbmsiIGhyZWY9IiMiIHRhcmdldD0iX2JsYW5rIiBzdHlsZT0iY29sb3I6ICMwMGJmZmY7Ij48L2E+PC9kaXY+CiAgICAgICAgPGRpdj48c3Ryb25nPkhPTUU6PC9zdHJvbmc+IDxhIGlkPSJob21lTGluayIgaHJlZj0iIyIgdGFyZ2V0PSJfYmxhbmsiIHN0eWxlPSJjb2xvcjogIzAwZmY0MTsgZm9udC13ZWlnaHQ6IGJvbGQ7Ij5SZXNvbHZpbmcuLi48L2E+PC9kaXY+CiAgICA8L2Rpdj4KCiAgICA8YnV0dG9uIG9uY2xpY2s9InRvZ2dsZVJlbmRlcigpIiBzdHlsZT0iYmFja2dyb3VuZDogIzU1NTsgY29sb3I6IHdoaXRlOyI+8J+Wpe+4jyBUb2dnbGUgUmVuZGVyPC9idXR0b24+CiAgICA8aWZyYW1lIGlkPSJyZW5kZXJGcmFtZSI+PC9pZnJhbWU+CgogICAgPGRpdiBpZD0iYWN0aW9ucyIgc3R5bGU9Im1hcmdpbi10b3A6IDIwcHg7IGJvcmRlci10b3A6IDFweCBzb2xpZCAjMzMzOyBwYWRkaW5nLXRvcDogMTVweDsiPgogICAgICA8YnV0dG9uIG9uY2xpY2s9InJlc29sdmVBbmRFeGVjdXRlKCdib29zdCcpIiBzdHlsZT0iYmFja2dyb3VuZDogIzE3YmY2MzsgY29sb3I6IHdoaXRlOyI+8J+UgSBCb29zdDwvYnV0dG9uPgogICAgICA8YnV0dG9uIG9uY2xpY2s9InJlc29sdmVBbmRFeGVjdXRlKCdmYXYnKSIgc3R5bGU9ImJhY2tncm91bmQ6ICNlMDI0NWU7IGNvbG9yOiB3aGl0ZTsiPuKdpO+4jyBGYXZvcml0ZTwvYnV0dG9uPgogICAgICA8ZGl2IHN0eWxlPSJtYXJnaW46IDE1cHggMDsiPgogICAgICAgIDxsYWJlbD5FbW9qaSBSZWFjdDo8L2xhYmVsPgogICAgICAgIDx0ZXh0YXJlYSBpZD0idGV4dGJveCIgbmFtZT0idGV4dGJveCIgcGxhY2Vob2xkZXI9IjplbW9qaToiPjwvdGV4dGFyZWE+CiAgICAgICAgPGJ1dHRvbiBvbmNsaWNrPSJyZXNvbHZlQW5kRXhlY3V0ZSgnZW1vamknKSIgc3R5bGU9ImJhY2tncm91bmQ6ICNmNDVkMjI7IGNvbG9yOiB3aGl0ZTsiPlJlYWN0PC9idXR0b24+CiAgICAgIDwvZGl2PgogICAgPC9kaXY+CiAgPC9kaXY+CgogIDxkaXYgaWQ9ImNsaS1kZWJ1ZyI+PiBDTEkgU3RhbmRieS48L2Rpdj4KCiAgPHNjcmlwdD4KLy8gQWRkIHRoaXMgZnVuY3Rpb24gdG8gaGFuZGxlIGVtb2ppIHNlbGVjdGlvbgpmdW5jdGlvbiBoYW5kbGVFbW9qaVNlbGVjdGlvbihlbW9qaSkgewogIGNvbnN0IHRleHRhcmVhID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3RleHRib3gnKTsKICBjb25zdCBjdXJyZW50VmFsdWUgPSB0ZXh0YXJlYS52YWx1ZS50cmltKCk7CiAgCiAgaWYgKGN1cnJlbnRWYWx1ZSkgewogICAgdGV4dGFyZWEudmFsdWUgPSBjdXJyZW50VmFsdWUgKyAnXG4nICsgZW1vamk7CiAgfSBlbHNlIHsKICAgIHRleHRhcmVhLnZhbHVlID0gZW1vamk7CiAgfQogIHRleHRhcmVhLmZvY3VzKCk7Cn0KICAgIGxldCBjdXJyZW50TG9jYWxJZCA9IG51bGw7CgogICAgZnVuY3Rpb24gY2xpTG9nKG1zZywgaXNFcnJvciA9IGZhbHNlKSB7CiAgICAgIGNvbnN0IGNsaSA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjbGktZGVidWcnKTsKICAgICAgY2xpLmlubmVySFRNTCArPSBgPGRpdiBjbGFzcz0iJHtpc0Vycm9yID8gJ2NsaS1lcnInIDogJyd9Ij5bJHtuZXcgRGF0ZSgpLnRvTG9jYWxlVGltZVN0cmluZygpfV0gJHttc2d9PC9kaXY+YDsKICAgICAgY2xpLnNjcm9sbFRvcCA9IGNsaS5zY3JvbGxIZWlnaHQ7CiAgICB9CgogICAgZnVuY3Rpb24gc2hvd1N0YXR1cyhtZXNzYWdlLCB0eXBlID0gJ2luZm8nKSB7CiAgICAgIGNvbnN0IHN0YXR1c0RpdiA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdzdGF0dXNNZXNzYWdlJyk7CiAgICAgIHN0YXR1c0Rpdi50ZXh0Q29udGVudCA9IG1lc3NhZ2U7CiAgICAgIHN0YXR1c0Rpdi5jbGFzc05hbWUgPSB0eXBlOwogICAgICBzdGF0dXNEaXYuc3R5bGUuZGlzcGxheSA9ICdibG9jayc7CiAgICAgIGlmICh0eXBlICE9PSAnbG9hZGluZycpIHNldFRpbWVvdXQoKCkgPT4gc3RhdHVzRGl2LnN0eWxlLmRpc3BsYXkgPSAnbm9uZScsIDUwMDApOwogICAgfQoKICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdwb3N0VXJsJykuYWRkRXZlbnRMaXN0ZW5lcignaW5wdXQnLCBhc3luYyAoZSkgPT4gewogICAgICAgIGNvbnN0IHVybCA9IGUudGFyZ2V0LnZhbHVlLnRyaW0oKTsKICAgICAgICBpZiAodXJsLnN0YXJ0c1dpdGgoJ2h0dHAnKSkgewogICAgICAgICAgICBjbGlMb2coYE5ldyBVUkwgZGV0ZWN0ZWQuYCk7CiAgICAgICAgICAgIGF3YWl0IGxvYWRSZW1vdGVQcmV2aWV3KHVybCk7CiAgICAgICAgICAgIGF3YWl0IHJlc29sdmVUb0hvbWUodXJsKTsKICAgICAgICB9CiAgICB9KTsKCiAgICBhc3luYyBmdW5jdGlvbiBsb2FkUmVtb3RlUHJldmlldyh1cmwpIHsKICAgICAgdHJ5IHsKICAgICAgICBjb25zdCB1cmxPYmogPSBuZXcgVVJMKHVybCk7CiAgICAgICAgY29uc3QgcmVzID0gYXdhaXQgZmV0Y2goYGh0dHBzOi8vJHt1cmxPYmouaG9zdG5hbWV9L2FwaS92MS9zdGF0dXNlcy8ke3VybE9iai5wYXRobmFtZS5zcGxpdCgnLycpLnBvcCgpfWApOwogICAgICAgIGNvbnN0IGRhdGEgPSBhd2FpdCByZXMuanNvbigpOwogICAgICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdwb3N0RGlzcGxheScpLnN0eWxlLmRpc3BsYXkgPSAnYmxvY2snOwogICAgICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdhdmF0YXInKS5zcmMgPSBkYXRhLmFjY291bnQuYXZhdGFyOwogICAgICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCd1c2VybmFtZScpLnRleHRDb250ZW50ID0gZGF0YS5hY2NvdW50LmRpc3BsYXlfbmFtZTsKICAgICAgICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgncG9zdENvbnRlbnQnKS5pbm5lckhUTUwgPSBkYXRhLmNvbnRlbnQ7CiAgICAgICAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3JlbW90ZUxpbmsnKS5ocmVmID0gdXJsOwogICAgICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdyZW1vdGVMaW5rJykudGV4dENvbnRlbnQgPSB1cmw7CiAgICAgIH0gY2F0Y2ggKGUpIHsgY2xpTG9nKGBQcmV2aWV3IGZhaWxlZDogJHtlLm1lc3NhZ2V9YCwgdHJ1ZSk7IH0KICAgIH0KCiAgICBhc3luYyBmdW5jdGlvbiByZXNvbHZlVG9Ib21lKHJlbW90ZVVybCkgewogICAgICAgIGNvbnN0IGhvbWVCYXNlID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2luc3RhbmNlJykudmFsdWUudHJpbSgpLnJlcGxhY2UoL1wvJC8sICIiKTsKICAgICAgICBjb25zdCBrZXkgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnYXBpa2V5JykudmFsdWUudHJpbSgpOwogICAgICAgIGNvbnN0IGhvbWVMaW5rRWwgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnaG9tZUxpbmsnKTsKICAgICAgICAKICAgICAgICBpZiAoIWhvbWVCYXNlIHx8ICFrZXkpIHJldHVybiBjbGlMb2coIlJlc29sdXRpb24gc2tpcHBlZDogTWlzc2luZyBjb25maWcuIiwgdHJ1ZSk7CgogICAgICAgIHRyeSB7CiAgICAgICAgICAgIGNvbnN0IGhlYWRlcnMgPSB7ICdBdXRob3JpemF0aW9uJzogYEJlYXJlciAke2tleX1gIH07CiAgICAgICAgICAgIGNvbnN0IHJlcyA9IGF3YWl0IGZldGNoKGAke2hvbWVCYXNlfS9hcGkvdjIvc2VhcmNoP3E9JHtlbmNvZGVVUklDb21wb25lbnQocmVtb3RlVXJsKX0mcmVzb2x2ZT10cnVlJnR5cGU9c3RhdHVzZXNgLCB7IGhlYWRlcnMgfSk7CiAgICAgICAgICAgIGNvbnN0IGRhdGEgPSBhd2FpdCByZXMuanNvbigpOwogICAgICAgICAgICAKICAgICAgICAgICAgaWYgKGRhdGEuc3RhdHVzZXM/Lmxlbmd0aCkgewogICAgICAgICAgICAgICAgY29uc3QgbG9jYWxQb3N0ID0gZGF0YS5zdGF0dXNlc1swXTsKICAgICAgICAgICAgICAgIGN1cnJlbnRMb2NhbElkID0gbG9jYWxQb3N0LmlkOwogICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAvLyBGZXRjaCBpbnRlcm5hbCBsb2NhbCBVUkwgZnJvbSBQbGVyb21hL0Fra29tYSBtZXRhZGF0YQogICAgICAgICAgICAgICAgLy8gUHJlZmVyIHBsZXJvbWEubG9jYWxfdmlldyBpZiBhdmFpbGFibGUsIGVsc2UgdXNlIHN0YW5kYXJkIHVybAogICAgICAgICAgICAgICAgY29uc3QgdmFsaWRIb21lVXJsID0gbG9jYWxQb3N0LnBsZXJvbWE/LmxvY2FsX3ZpZXcgfHwgbG9jYWxQb3N0LnVybDsKICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgaG9tZUxpbmtFbC5ocmVmID0gdmFsaWRIb21lVXJsOwogICAgICAgICAgICAgICAgaG9tZUxpbmtFbC50ZXh0Q29udGVudCA9IHZhbGlkSG9tZVVybDsKICAgICAgICAgICAgICAgIGNsaUxvZyhgUkVTT0xWRUQ6IExvY2FsIElEICR7Y3VycmVudExvY2FsSWR9YCk7CiAgICAgICAgICAgICAgICBjbGlMb2coYFZBTElEIEhPTUUgVVJMOiAke3ZhbGlkSG9tZVVybH1gKTsKICAgICAgICAgICAgfSBlbHNlIHsKICAgICAgICAgICAgICAgIGhvbWVMaW5rRWwudGV4dENvbnRlbnQgPSAiTm90IGZvdW5kIG9uIGhvbWUgaW5zdGFuY2UuIjsKICAgICAgICAgICAgfQogICAgICAgIH0gY2F0Y2ggKGUpIHsgY2xpTG9nKGBSZXNvbHZlIEVycm9yOiAke2UubWVzc2FnZX1gLCB0cnVlKTsgfQogICAgfQoKICAgIGFzeW5jIGZ1bmN0aW9uIHJlc29sdmVBbmRFeGVjdXRlKHR5cGUpIHsKICAgICAgY29uc3QgaG9tZUJhc2UgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnaW5zdGFuY2UnKS52YWx1ZS50cmltKCkucmVwbGFjZSgvXC8kLywgIiIpOwogICAgICBjb25zdCBrZXkgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnYXBpa2V5JykudmFsdWUudHJpbSgpOwogICAgICBpZiAoIWN1cnJlbnRMb2NhbElkKSByZXR1cm4gc2hvd1N0YXR1cygiTm90IHJlc29sdmVkIiwgImVycm9yIik7CgogICAgICBzaG93U3RhdHVzKGBBcHBseWluZyAke3R5cGV9Li4uYCwgJ2xvYWRpbmcnKTsKICAgICAgdHJ5IHsKICAgICAgICBjb25zdCBoZWFkZXJzID0geyAnQXV0aG9yaXphdGlvbic6IGBCZWFyZXIgJHtrZXl9YCwgJ0NvbnRlbnQtVHlwZSc6ICdhcHBsaWNhdGlvbi9qc29uJyB9OwogICAgICAgIGlmICh0eXBlID09PSAnZW1vamknKSB7CiAgICAgICAgICAgIGNvbnN0IGVtb2ppcyA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCd0ZXh0Ym94JykudmFsdWUuc3BsaXQoL1tcblxzLF0rLykuZmlsdGVyKGUgPT4gZS50cmltKCkpOwogICAgICAgICAgICBmb3IgKGNvbnN0IGVtb2ppIG9mIGVtb2ppcykgewogICAgICAgICAgICAgICAgY29uc3QgY2xlYW4gPSBlbW9qaS5yZXBsYWNlKC86L2csICIiKTsKICAgICAgICAgICAgICAgIGNvbnN0IHJlcyA9IGF3YWl0IGZldGNoKGAke2hvbWVCYXNlfS9hcGkvdjEvcGxlcm9tYS9zdGF0dXNlcy8ke2N1cnJlbnRMb2NhbElkfS9yZWFjdGlvbnMvJHtlbmNvZGVVUklDb21wb25lbnQoY2xlYW4pfWAsIHsgbWV0aG9kOiAiUFVUIiwgaGVhZGVycyB9KTsKICAgICAgICAgICAgICAgIGNsaUxvZyhgUmVhY3Rpb24gWyR7Y2xlYW59XSBIVFRQICR7cmVzLnN0YXR1c31gKTsKICAgICAgICAgICAgfQogICAgICAgICAgICBzaG93U3RhdHVzKCdTdWNjZXNzJywgJ3N1Y2Nlc3MnKTsKICAgICAgICB9IGVsc2UgewogICAgICAgICAgICBjb25zdCBwYXRoID0gdHlwZSA9PT0gJ2ZhdicgPyAnZmF2b3VyaXRlJyA6ICdyZWJsb2cnOwogICAgICAgICAgICBjb25zdCByZXMgPSBhd2FpdCBmZXRjaChgJHtob21lQmFzZX0vYXBpL3YxL3N0YXR1c2VzLyR7Y3VycmVudExvY2FsSWR9LyR7cGF0aH1gLCB7IG1ldGhvZDogIlBPU1QiLCBoZWFkZXJzIH0pOwogICAgICAgICAgICBjbGlMb2coYCR7dHlwZS50b1VwcGVyQ2FzZSgpfSBIVFRQICR7cmVzLnN0YXR1c31gKTsKICAgICAgICAgICAgaWYgKHJlcy5vaykgc2hvd1N0YXR1cygnRG9uZScsICdzdWNjZXNzJyk7CiAgICAgICAgfQogICAgICB9IGNhdGNoIChlKSB7IGNsaUxvZyhlLm1lc3NhZ2UsIHRydWUpOyB9CiAgICB9CgogICAgZnVuY3Rpb24gdG9nZ2xlUmVuZGVyKCkgewogICAgICBjb25zdCBmcmFtZSA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdyZW5kZXJGcmFtZScpOwogICAgICBmcmFtZS5zcmMgPSBmcmFtZS5zdHlsZS5kaXNwbGF5ID09PSAnbm9uZScgPyBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgncG9zdFVybCcpLnZhbHVlLnRyaW0oKSA6ICIiOwogICAgICBmcmFtZS5zdHlsZS5kaXNwbGF5ID0gZnJhbWUuc3R5bGUuZGlzcGxheSA9PT0gJ25vbmUnID8gJ2Jsb2NrJyA6ICdub25lJzsKICAgIH0KCiAgICBmdW5jdGlvbiByZWFkRnJvbVN0b3JhZ2UoKSB7CiAgICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCJhcGlrZXkiKS52YWx1ZSA9IGxvY2FsU3RvcmFnZS5nZXRJdGVtKCJhcGlrZXkiKSB8fCAiIjsKICAgICAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoImluc3RhbmNlIikudmFsdWUgPSBsb2NhbFN0b3JhZ2UuZ2V0SXRlbSgiaW5zdGFuY2UiKSB8fCAiIjsKICAgICAgY2xpTG9nKCJTdG9yYWdlIHJlYWQuIik7CiAgICB9CiAgPC9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPg==
