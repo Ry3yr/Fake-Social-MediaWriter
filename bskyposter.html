@@ -251,6 +251,12 @@
       cursor: pointer;
       font-weight: bold;
     }
+    
+    .duration-warning {
+      color: #dc3545;
+      font-size: 0.9em;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -261,7 +267,7 @@
       <summary>Troubleshooting</summary>
       <p>This Bluesky poster works entirely in your browser. No server-side code is involved for authentication or posting.</p>
       <p><strong>Security:</strong> Your credentials are sent only to Bluesky's official API at bsky.social</p>
-      <p><strong>Media:</strong> Supports images (JPEG, PNG, GIF, WebP) and videos (MP4, max 15s, 1MB each)</p>
+      <p><strong>Media:</strong> Supports images (JPEG, PNG, GIF, WebP) and videos (MP4, WebM, max 2 minutes, 20MB each)</p>
     </details>
     
     <div id="authStatus" class="info-box hidden"></div>
@@ -310,12 +316,12 @@
       <div class="media-section">
         <h4>Media Upload</h4>
         <div class="info-box">
-          <p><strong>Supported formats:</strong> JPEG, PNG, GIF, WebP (images) • MP4 (videos, max 15s)</p>
-          <p><strong>Max size:</strong> 1MB per file • Max 4 files</p>
+          <p><strong>Supported formats:</strong> JPEG, PNG, GIF, WebP (images) • MP4, WebM (videos, max 2 minutes)</p>
+          <p><strong>Max size:</strong> 20MB per file • Max 4 files</p>
         </div>
         
         <div class="media-controls">
-          <input type="file" id="mediaInput" accept="image/*,video/mp4,video/quicktime" multiple />
+          <input type="file" id="mediaInput" accept="image/*,video/mp4,video/webm,video/quicktime" multiple />
           <button type="button" id="addMediaBtn">Add Media</button>
           <button type="button" id="clearMediaBtn">Clear All Media</button>
         </div>
@@ -376,10 +382,11 @@
   <script>
     const PDS_HOST = "https://bsky.social";
     const MAX_POST_LENGTH = 300;
-    const MAX_MEDIA_SIZE = 1048576; // 1MB
+    const MAX_MEDIA_SIZE = 20971520; // 20MB (Bluesky's actual limit)
     const MAX_MEDIA_COUNT = 4;
+    const MAX_VIDEO_DURATION = 120; // 2 minutes in seconds
     const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-    const SUPPORTED_VIDEO_TYPES = ["video/mp4", "video/quicktime"];
+    const SUPPORTED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
     const SUPPORTED_MEDIA_TYPES = [...SUPPORTED_IMAGE_TYPES, ...SUPPORTED_VIDEO_TYPES];
     
     let state = {
@@ -572,9 +579,15 @@
         html += `<br><br><strong>Media:</strong> ${mediaFiles.length} file(s) attached`;
         mediaFiles.forEach((file, index) => {
           const mediaType = file.type.startsWith("image/") ? "Image" : "Video";
-          html += `<br>• ${file.name} (${mediaType}, ${(file.size / 1024).toFixed(1)}KB)`;
+          html += `<br>• ${file.name} (${mediaType}, ${(file.size / (1024 * 1024)).toFixed(2)}MB)`;
           if (file.altText) {
             html += ` - Alt: ${file.altText}`;
+          }
+          if (file.duration) {
+            html += ` - Duration: ${Math.round(file.duration)}s`;
+            if (file.duration > MAX_VIDEO_DURATION) {
+              html += ` <span class="duration-warning">(Exceeds ${MAX_VIDEO_DURATION}s limit!)</span>`;
+            }
           }
         });
       }
@@ -597,12 +610,15 @@
       let html = "";
       mediaFiles.forEach((file, index) => {
         const altText = file.altText || file.name;
-        const sizeKB = (file.size / 1024).toFixed(1);
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
         const mediaType = file.type.startsWith("image/") ? "Image" : "Video";
+        const durationInfo = file.duration ? ` - ${Math.round(file.duration)}s` : '';
         
         html += `
           <div class="media-item">
-            <strong>${index + 1}. ${file.name}</strong> (${mediaType}, ${sizeKB}KB)
+            <strong>${index + 1}. ${file.name}</strong> (${mediaType}, ${sizeMB}MB${durationInfo})
+            ${file.duration && file.duration > MAX_VIDEO_DURATION ? 
+              `<div class="duration-warning">⚠️ Video exceeds ${MAX_VIDEO_DURATION}s limit!</div>` : ''}
             <div>
               <label>Alt Text:</label>
               <input type="text" class="media-alt-text" data-index="${index}" value="${altText}" placeholder="Describe this media for accessibility" />
@@ -634,6 +650,12 @@
             video.controls = true;
             video.muted = true;
             video.preload = "metadata";
+            
+            video.addEventListener('loadedmetadata', () => {
+              file.duration = video.duration;
+              updatePreview();
+            });
+            
             mediaPreviewDiv.appendChild(video);
           };
           reader.readAsDataURL(file);
@@ -669,13 +691,15 @@
         const file = files[i];
         
         if (!SUPPORTED_MEDIA_TYPES.includes(file.type)) {
-          showMessage(`Unsupported file type: ${file.type}. Supported: JPEG, PNG, GIF, WebP, MP4`, "error");
+          showMessage(`Unsupported file type: ${file.type}. Supported: JPEG, PNG, GIF, WebP, MP4, WebM`, "error");
           continue;
         }
         
         if (file.size > MAX_MEDIA_SIZE) {
+          const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+          const maxSizeMB = (MAX_MEDIA_SIZE / (1024 * 1024)).toFixed(2);
           showMessage(
-            `File ${file.name} is too large (${(file.size / 1024).toFixed(1)}KB). Max: ${(MAX_MEDIA_SIZE / 1024).toFixed(0)}KB`,
+            `File ${file.name} is too large (${fileSizeMB}MB). Maximum size is ${maxSizeMB}MB`,
             "error"
           );
           continue;
@@ -688,12 +712,37 @@
         
         file.altText = file.name;
         mediaFiles.push(file);
+        
+        // Check video duration if it's a video
+        if (file.type.startsWith("video/")) {
+          checkVideoDuration(file);
+        }
       }
       
       document.getElementById("mediaInput").value = "";
       updateMediaPreview();
       updatePreview();
       updateCharCounter();
+    }
+    
+    function checkVideoDuration(videoFile) {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      
+      video.onloadedmetadata = function() {
+        videoFile.duration = video.duration;
+        if (video.duration > MAX_VIDEO_DURATION) {
+          showMessage(`Video ${videoFile.name} exceeds 2-minute limit (${Math.round(video.duration)}s)`, "error");
+        }
+        updatePreview();
+      };
+      
+      video.onerror = function() {
+        // Couldn't load metadata, will check during upload
+        videoFile.duration = null;
+      };
+      
+      video.src = URL.createObjectURL(videoFile);
     }
     
     function clearAllMedia() {
@@ -774,8 +823,8 @@
         }
       } catch (error) {
         return {
-          success: false,
-          error: "Network error: " + error.message,
+            success: false,
+            error: "Network error: " + error.message,
         };
       }
     }
@@ -806,8 +855,8 @@
         }
       } catch (error) {
         return {
-          success: false,
-          error: "Network error: " + error.message,
+            success: false,
+            error: "Network error: " + error.message,
         };
       }
     }
@@ -885,8 +934,8 @@
         }
       } catch (error) {
         return {
-          success: false,
-          error: "Network error: " + error.message,
+            success: false,
+            error: "Network error: " + error.message,
         };
       }
     }
@@ -995,6 +1044,14 @@
       if (postText.length > MAX_POST_LENGTH) {
         showMessage(`Post exceeds ${MAX_POST_LENGTH} characters`, "error");
         return;
+      }
+      
+      // Check video durations before posting
+      for (const file of mediaFiles) {
+        if (file.type.startsWith("video/") && file.duration && file.duration > MAX_VIDEO_DURATION) {
+          showMessage(`Video ${file.name} exceeds 2-minute limit (${Math.round(file.duration)}s)`, "error");
+          return;
+        }
       }
 
       logToDom("Starting Bluesky post process...");
