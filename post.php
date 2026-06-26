@@ -33,6 +33,9 @@
         }
     </script>
 [<a target="_blank" href="https://alcea-wisteria.de/PHP/0demo/2023-08-15-JSFiddle-Clone/htmls/2025-07-26-Escape-code-snippet.html#https://codepen.io/ryedai1/pen/LEpRyGy" style=color:violet>EscapeCode</a>] <a target="_blank" href="https://alcea-wisteria.de/PHP/0demo/2023-08-15-JSFiddle-Clone/htmls/2025-11-06-Html2Source.html" style=color:gray>HTML2SRC</a> <button onclick="pasteCharacter()">QUOTE</button>
+
+<button onclick="var t=document.getElementById('textbox'),p=t.selectionStart;t.value=t.value.slice(0,p)+'<span style=background:black;color:black;cursor:pointer onclick=this.style.background=this.style.background===&quot;black&quot;?&quot;transparent&quot;:&quot;black&quot;;this.style.color=this.style.color===&quot;black&quot;?&quot;inherit&quot;:&quot;black&quot;>spoiler text</span> '+t.value.slice(p);t.selectionStart=t.selectionEnd=p+'<span style=background:black;color:black;cursor:pointer onclick=this.style.background=this.style.background===&quot;black&quot;?&quot;transparent&quot;:&quot;black&quot;;this.style.color=this.style.color===&quot;black&quot;?&quot;inherit&quot;:&quot;black&quot;>spoiler text</span> '.length">🙈 SPOILER</button>
+
 &nbsp;<button onclick="const url=document.getElementById('urlInput').value.trim();if(url && new RegExp('^(https?|ftp)://').test(url))document.getElementById('textbox').value='💬'+url+'#💬 \n•acws #acws\n'+document.getElementById('textbox').value;else alert('Invalid Fediverse Post URL')">💬</button><input id="urlInput" style="border:none;width:250px;padding:5px" placeholder="Enter URL"/> <a target="_blank" href="/other/extra/scripts/fakesocialmedia/0ld/data_akkoma_update.php" style=color:blue>✨🆕</a>
 <br>
 <a href="#" id="pasteLink">#CurrListeningAlcea</a>
